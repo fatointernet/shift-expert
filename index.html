@@ -28,12 +28,10 @@
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // --- IMPORTACIONES CORRECTAS PARA NAVEGADOR ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-        // --- TU CONFIGURACIÓN DE FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyDaAn2WUiHDnIRU5SZ9sogOsICUcvG1DSI",
             authDomain: "notasdegasto-12d33.firebaseapp.com",
@@ -43,13 +41,11 @@
             appId: "1:979069209782:web:1d7ccd86e6b9f390caea17"
         };
 
-        // Inicialización
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = 'anav-shift-calc-v5';
 
-        // --- DATA SALARIAL ---
         const SALARY_DATA = {
             "G I": { "1-9": { hora_extra: 106.34, nocturna: 8.75, plus_llamada: 134.98, reten_l: 62.47, reten_f: 108.35 }, "10-12": { hora_extra: 119.26, nocturna: 9.80, plus_llamada: 147.54, reten_l: 64.31, reten_f: 115.20 } },
             "G II": { "1-9": { hora_extra: 84.49, nocturna: 6.95, plus_llamada: 113.97, reten_l: 59.86, reten_f: 102.15 }, "10-12": { hora_extra: 94.79, nocturna: 7.80, plus_llamada: 123.86, reten_l: 60.80, reten_f: 108.40 } },
@@ -283,8 +279,13 @@
                                 <div className="bg-indigo-600 p-5 rounded-[28px] shadow-2xl text-white"><Icon name="calendar" size={32} /></div>
                                 <div>
                                     <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">ANAV ShiftExpert</h1>
-                                    <div onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase cursor-pointer hover:bg-indigo-100 bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100">
-                                        <Icon name="user" size={14} /> {user.email?.split('@')[0]} <Icon name="settings" size={14} />
+                                    <div className="flex items-center gap-2">
+                                        <div onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase cursor-pointer hover:bg-indigo-100 bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100">
+                                            <Icon name="user" size={14} /> {user.email?.split('@')[0]} <Icon name="settings" size={14} />
+                                        </div>
+                                        <button onClick={() => signOut(auth)} className="flex items-center gap-2 text-red-600 font-black text-[10px] uppercase cursor-pointer hover:bg-red-100 bg-red-50 px-4 py-1.5 rounded-full border border-red-100">
+                                            <Icon name="log-out" size={14} /> Salir
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -383,7 +384,7 @@
 
                     {isSettingsOpen && (
                         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
-                            <div className="bg-white w-full max-w-xl rounded-[60px] p-10 md:p-14 border border-white/20">
+                            <div className="bg-white w-full max-w-xl rounded-[60px] p-10 md:p-14 border border-white/20 overflow-y-auto max-h-[90vh]">
                                 <div className="flex justify-between items-center mb-10"><h3 className="text-3xl font-black">Ajustes</h3><button onClick={() => signOut(auth)} className="flex items-center gap-2 p-3 bg-red-50 text-red-600 font-black text-[10px] uppercase rounded-2xl">Salir</button></div>
                                 <div className="space-y-8">
                                     <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Grupo</label><div className="grid grid-cols-4 gap-2">{Object.keys(SALARY_DATA).map(g => <button key={g} onClick={() => { const p = {...userProfile, group: g}; setUserProfile(p); persist(p, 'profile'); }} className={`py-4 rounded-3xl font-black text-sm border-2 ${userProfile.group === g ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{g}</button>)}</div></section>
