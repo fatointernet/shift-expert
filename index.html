@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANAV ShiftExpert v5.6 - Estadísticas Globales</title>
+    <title>ANAV ShiftExpert v5.6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -18,7 +18,6 @@
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .animate-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
         .day-card .clear-btn { opacity: 0; transition: opacity 0.2s; }
         .day-card:hover .clear-btn { opacity: 1; }
     </style>
@@ -29,29 +28,26 @@
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // --- FIREBASE IMPORTS ---
+        // --- IMPORTACIONES CORRECTAS PARA NAVEGADOR ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-        // --- CONFIGURACIÓN ---
-        // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+        // --- TU CONFIGURACIÓN DE FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDaAn2WUiHDnIRU5SZ9sogOsICUcvG1DSI",
+            authDomain: "notasdegasto-12d33.firebaseapp.com",
+            projectId: "notasdegasto-12d33",
+            storageBucket: "notasdegasto-12d33.firebasestorage.app",
+            messagingSenderId: "979069209782",
+            appId: "1:979069209782:web:1d7ccd86e6b9f390caea17"
+        };
 
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyDaAn2WUiHDnIRU5SZ9sogOsICUcvG1DSI",
-  authDomain: "notasdegasto-12d33.firebaseapp.com",
-  projectId: "notasdegasto-12d33",
-  storageBucket: "notasdegasto-12d33.firebasestorage.app",
-  messagingSenderId: "979069209782",
-  appId: "1:979069209782:web:1d7ccd86e6b9f390caea17"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+        // Inicialización
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = 'anav-shift-calc-v5';
 
         // --- DATA SALARIAL ---
         const SALARY_DATA = {
@@ -80,12 +76,7 @@ const app = initializeApp(firebaseConfig);
         ];
 
         const STANDARD_CONCEPTS = [
-            { id: 'trc', label: 'Plus TRC' },
-            { id: 'tra', label: 'Plus TRA' },
-            { id: 'plus_llamada', label: 'Plus Llamada' },
-            { id: 'comp_llamada', label: 'Comp. Llamada' },
-            { id: 'comida', label: 'Ayuda Comida' },
-            { id: 'comp_km', label: 'Comp. Kilometraje' }
+            { id: 'trc', label: 'Plus TRC' }, { id: 'tra', label: 'Plus TRA' }, { id: 'plus_llamada', label: 'Plus Llamada' }, { id: 'comp_llamada', label: 'Comp. Llamada' }, { id: 'comida', label: 'Ayuda Comida' }, { id: 'comp_km', label: 'Comp. Kilometraje' }
         ];
 
         const toLocalISO = (date) => {
@@ -96,30 +87,16 @@ const app = initializeApp(firebaseConfig);
         const Icon = ({ name, size = 20, className = "" }) => {
             useEffect(() => {
                 if (window.lucide) {
-                    window.lucide.createIcons({
-                        attrs: { stroke: 'currentColor', 'stroke-width': 2 },
-                        nameAttr: 'data-lucide'
-                    });
+                    window.lucide.createIcons({ attrs: { stroke: 'currentColor', 'stroke-width': 2 }, nameAttr: 'data-lucide' });
                 }
             }, [name]);
-            return (
-                <span className={`inline-flex items-center justify-center ${className}`}>
-                    <i data-lucide={name} style={{ width: size, height: size }}></i>
-                </span>
-            );
+            return <span className={`inline-flex items-center justify-center ${className}`}><i data-lucide={name} style={{ width: size, height: size }}></i></span>;
         };
 
-        // Componente de Gráfico de Quesito SVG
         const PieChart = ({ data }) => {
             const total = data.reduce((acc, item) => acc + item.value, 0);
             let currentAngle = 0;
-
-            if (total === 0) return (
-                <div className="flex items-center justify-center h-64 bg-slate-50 rounded-full border-4 border-dashed border-slate-200">
-                    <p className="text-slate-400 font-bold uppercase text-xs">Sin datos</p>
-                </div>
-            );
-
+            if (total === 0) return <div className="flex items-center justify-center h-64 bg-slate-50 rounded-full border-4 border-dashed border-slate-200"><p className="text-slate-400 font-bold uppercase text-xs">Sin datos</p></div>;
             return (
                 <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
                     {data.map((item, index) => {
@@ -131,9 +108,7 @@ const app = initializeApp(firebaseConfig);
                         const x2 = 50 + 40 * Math.cos((Math.PI * currentAngle) / 180);
                         const y2 = 50 + 40 * Math.sin((Math.PI * currentAngle) / 180);
                         const largeArcFlag = sliceAngle > 180 ? 1 : 0;
-                        const d = `M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
-                        
-                        return <path key={index} d={d} fill={item.color} className="hover:opacity-80 transition-opacity cursor-pointer" />;
+                        return <path key={index} d={`M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2} Z`} fill={item.color} className="hover:opacity-80 transition-opacity cursor-pointer" />;
                     })}
                     <circle cx="50" cy="50" r="20" fill="white" />
                 </svg>
@@ -146,15 +121,10 @@ const app = initializeApp(firebaseConfig);
             const [currentDate, setCurrentDate] = useState(new Date());
             const [shiftsData, setShiftsData] = useState({});
             const [userProfile, setUserProfile] = useState({ group: "G V", level: "7", kmCount: 46 });
-            const [dataLoading, setDataLoading] = useState(false);
             const [selectedDay, setSelectedDay] = useState(null);
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-            const [activeTab, setActiveTab] = useState('calendar'); // 'calendar' | 'stats'
-            
-            const [manualLabel, setManualLabel] = useState('');
-            const [manualValue, setManualValue] = useState('');
-
+            const [activeTab, setActiveTab] = useState('calendar');
             const [authEmail, setAuthEmail] = useState('');
             const [authPassword, setAuthPassword] = useState('');
             const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -163,38 +133,21 @@ const app = initializeApp(firebaseConfig);
             const [resetSuccess, setResetSuccess] = useState(false);
 
             useEffect(() => {
-                const initAuth = async () => {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
                     setAuthLoading(false);
-                };
-                initAuth();
-                const unsubscribe = onAuthStateChanged(auth, setUser);
+                });
                 return () => unsubscribe();
             }, []);
 
             useEffect(() => {
                 if (!user) return;
-                setDataLoading(true);
-                const unsubShifts = onSnapshot(
-                    doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'shifts'), 
-                    (snap) => {
-                        if (snap.exists()) setShiftsData(snap.data().data || {});
-                        setDataLoading(false);
-                    }, 
-                    (err) => setDataLoading(false)
-                );
-
-                const unsubProfile = onSnapshot(
-                    doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile'), 
-                    (snap) => {
-                        if (snap.exists()) setUserProfile(prev => ({ ...prev, ...snap.data() }));
-                    },
-                    (err) => console.error("Error perfil", err)
-                );
+                const unsubShifts = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'shifts'), (snap) => {
+                    if (snap.exists()) setShiftsData(snap.data().data || {});
+                });
+                const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile'), (snap) => {
+                    if (snap.exists()) setUserProfile(prev => ({ ...prev, ...snap.data() }));
+                });
                 return () => { unsubShifts(); unsubProfile(); };
             }, [user]);
 
@@ -206,8 +159,7 @@ const app = initializeApp(firebaseConfig);
 
             const persist = async (newData, path) => {
                 if (!user) return;
-                try {
-                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'data', path), { data: newData, updatedAt: Date.now() });
+                try { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'data', path), { data: newData, updatedAt: Date.now() });
                 } catch (e) { console.error("Error persistencia", e); }
             };
 
@@ -217,19 +169,14 @@ const app = initializeApp(firebaseConfig);
                 const manualConcepts = data.manualConcepts || [];
                 const isReten = data.isReten || false;
                 if (!shiftId && !isReten && manualConcepts.length === 0) return { total: 0, details: [] };
-                
                 const date = new Date(dateStr);
-                const isF = (d) => { const day = d.getDay(); return day === 0 || day === 6; };
-                const festive = isF(date);
+                const festive = date.getDay() === 0 || date.getDay() === 6;
                 const results = { total: 0, details: [] };
-                
                 const add = (label, value, iconType) => { 
                     const val = parseFloat(value);
                     if (!isNaN(val) && val > 0) { results.total += val; results.details.push({ label, value: val, iconType }); }
                 };
-
                 if (isReten) add(`Retén ${festive ? 'F' : 'L'}`, festive ? activeConstants.reten_f : activeConstants.reten_l, 'shield');
-                
                 activeConcepts.forEach(cid => {
                     switch(cid) {
                         case 'trc':
@@ -242,7 +189,6 @@ const app = initializeApp(firebaseConfig);
                         case 'comp_km': if (activeConcepts.includes('plus_llamada')) add('Kilometraje', (userProfile.kmCount || 0) * CONSTANTS.PRECIO_KM, 'map'); break;
                     }
                 });
-
                 if (shiftId && shiftId !== 'D') {
                     const finalExtras = parseFloat(data.extras) || (shiftId === 'R7' || shiftId === 'R9' ? (festive ? 12 : 3.5) : 0);
                     if (finalExtras > 0) add(`HE ${finalExtras}h`, finalExtras * activeConstants.hora_extra, 'clock');
@@ -262,14 +208,13 @@ const app = initializeApp(firebaseConfig);
                         const calc = calculateDaily(dateStr, data); 
                         total += calc.total;
                         calc.details.forEach(d => {
-                            if (d.iconType === 'trc') items.trc += d.value;
-                            else if (d.iconType === 'tra') items.tra += d.value;
-                            else if (d.iconType === 'phone') items.llamada += d.value;
-                            else if (d.iconType === 'food') items.alim += d.value;
-                            else if (d.iconType === 'map') items.km += d.value;
-                            else if (d.iconType === 'clock') items.extras += d.value;
-                            else if (d.iconType === 'moon') items.nocturna += d.value;
-                            else if (d.iconType === 'shield') items.reten += d.value;
+                            if (items[d.iconType] !== undefined) items[d.iconType] += d.value;
+                            else if (['phone'].includes(d.iconType)) items.llamada += d.value;
+                            else if (['food'].includes(d.iconType)) items.alim += d.value;
+                            else if (['map'].includes(d.iconType)) items.km += d.value;
+                            else if (['clock'].includes(d.iconType)) items.extras += d.value;
+                            else if (['moon'].includes(d.iconType)) items.nocturna += d.value;
+                            else if (['shield'].includes(d.iconType)) items.reten += d.value;
                             else items.custom += d.value;
                         });
                     }
@@ -277,61 +222,24 @@ const app = initializeApp(firebaseConfig);
                 return { total, ...items };
             }, [shiftsData, currentDate, activeConstants, userProfile.kmCount]);
 
-            // Estadísticas de todos los meses
             const globalStats = useMemo(() => {
                 const global = { trc: 0, tra: 0, llamada: 0, alim: 0, km: 0, extras: 0, nocturna: 0, reten: 0, custom: 0, total: 0 };
                 Object.entries(shiftsData).forEach(([dateStr, data]) => {
                     const calc = calculateDaily(dateStr, data);
                     global.total += calc.total;
                     calc.details.forEach(d => {
-                        if (d.iconType === 'trc') global.trc += d.value;
-                        else if (d.iconType === 'tra') global.tra += d.value;
-                        else if (d.iconType === 'phone') global.llamada += d.value;
-                        else if (d.iconType === 'food') global.alim += d.value;
-                        else if (d.iconType === 'map') global.km += d.value;
-                        else if (d.iconType === 'clock') global.extras += d.value;
-                        else if (d.iconType === 'moon') global.nocturna += d.value;
-                        else if (d.iconType === 'shield') global.reten += d.value;
+                        if (global[d.iconType] !== undefined) global[d.iconType] += d.value;
+                        else if (['phone'].includes(d.iconType)) global.llamada += d.value;
+                        else if (['food'].includes(d.iconType)) global.alim += d.value;
+                        else if (['map'].includes(d.iconType)) global.km += d.value;
+                        else if (['clock'].includes(d.iconType)) global.extras += d.value;
+                        else if (['moon'].includes(d.iconType)) global.nocturna += d.value;
+                        else if (['shield'].includes(d.iconType)) global.reten += d.value;
                         else global.custom += d.value;
                     });
                 });
                 return global;
             }, [shiftsData, activeConstants, userProfile.kmCount]);
-
-            const chartData = [
-                { name: 'Plus TRC', value: globalStats.trc, color: '#6366f1' },
-                { name: 'Plus TRA', value: globalStats.tra, color: '#f59e0b' },
-                { name: 'Llamada/Comp', value: globalStats.llamada, color: '#ef4444' },
-                { name: 'Alimentación', value: globalStats.alim, color: '#10b981' },
-                { name: 'Kilometraje', value: globalStats.km, color: '#0ea5e9' },
-                { name: 'Horas Extras', value: globalStats.extras, color: '#8b5cf6' },
-                { name: 'Nocturnidad', value: globalStats.nocturna, color: '#334155' },
-                { name: 'Retenes', value: globalStats.reten, color: '#4f46e5' },
-                { name: 'Otros', value: globalStats.custom, color: '#94a3b8' },
-            ];
-
-            const handleDayClick = (day) => {
-                const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-                const dateStr = toLocalISO(date);
-                const data = shiftsData[dateStr] || { shift: 'D', extras: null, horasNocturnas: null, activeConcepts: [], manualConcepts: [], isReten: false };
-                setSelectedDay({ day, dateStr, ...data });
-                setIsModalOpen(true);
-            };
-
-            const clearDay = (e, dateStr) => {
-                e.stopPropagation();
-                const newData = { ...shiftsData };
-                delete newData[dateStr];
-                setShiftsData(newData);
-                persist(newData, 'shifts');
-            };
-
-            const updateDay = (updated) => {
-                const newData = { ...shiftsData, [updated.dateStr]: updated };
-                setShiftsData(newData);
-                setSelectedDay(updated);
-                persist(newData, 'shifts');
-            };
 
             const handleAuth = async (e) => {
                 e.preventDefault();
@@ -340,12 +248,12 @@ const app = initializeApp(firebaseConfig);
                     if (isResetMode) { await sendPasswordResetEmail(auth, authEmail); setResetSuccess(true); }
                     else if (isRegisterMode) { await createUserWithEmailAndPassword(auth, authEmail, authPassword); }
                     else { await signInWithEmailAndPassword(auth, authEmail, authPassword); }
-                } catch (err) { setAuthError("Error en autenticación"); }
+                } catch (err) { setAuthError("Error: verifica tus datos"); }
             };
 
             if (authLoading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>;
 
-            if (!user || user.isAnonymous) return (
+            if (!user) return (
                 <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 antialiased">
                     <div className="bg-slate-900 w-full max-w-md rounded-[48px] shadow-2xl p-10 border border-slate-800 animate-in">
                         <div className="flex flex-col items-center mb-10 text-white">
@@ -369,7 +277,6 @@ const app = initializeApp(firebaseConfig);
 
             return (
                 <div className="min-h-screen bg-slate-50 p-4 md:p-8 animate-in pb-24 md:pb-8">
-                    {/* Header y Tab Switcher */}
                     <div className="max-w-7xl mx-auto mb-10 space-y-8">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="flex items-center gap-6">
@@ -377,27 +284,15 @@ const app = initializeApp(firebaseConfig);
                                 <div>
                                     <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">ANAV ShiftExpert</h1>
                                     <div onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase cursor-pointer hover:bg-indigo-100 bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100">
-                                        <Icon name="user" size={14} /> {user.email?.split('@')[0] || 'Usuario'} <Icon name="settings" size={14} />
+                                        <Icon name="user" size={14} /> {user.email?.split('@')[0]} <Icon name="settings" size={14} />
                                     </div>
                                 </div>
                             </div>
-
                             <div className="flex bg-white p-1.5 rounded-[24px] shadow-xl border border-slate-100 font-black uppercase text-[10px] tracking-widest">
-                                <button 
-                                    onClick={() => setActiveTab('calendar')}
-                                    className={`px-8 py-3 rounded-[18px] transition-all flex items-center gap-2 ${activeTab === 'calendar' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-                                >
-                                    <Icon name="calendar" size={14} /> Calendario
-                                </button>
-                                <button 
-                                    onClick={() => setActiveTab('stats')}
-                                    className={`px-8 py-3 rounded-[18px] transition-all flex items-center gap-2 ${activeTab === 'stats' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-                                >
-                                    <Icon name="pie-chart" size={14} /> Estadísticas
-                                </button>
+                                <button onClick={() => setActiveTab('calendar')} className={`px-8 py-3 rounded-[18px] transition-all flex items-center gap-2 ${activeTab === 'calendar' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}><Icon name="calendar" size={14} /> Calendario</button>
+                                <button onClick={() => setActiveTab('stats')} className={`px-8 py-3 rounded-[18px] transition-all flex items-center gap-2 ${activeTab === 'stats' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}><Icon name="pie-chart" size={14} /> Estadísticas</button>
                             </div>
                         </div>
-
                         {activeTab === 'calendar' && (
                             <div className="flex justify-center">
                                 <div className="flex items-center bg-white shadow-2xl border border-slate-100 rounded-[32px] p-2.5">
@@ -418,8 +313,7 @@ const app = initializeApp(firebaseConfig);
                                     </div>
                                     <div className="grid grid-cols-7">
                                         {(() => {
-                                            const year = currentDate.getFullYear();
-                                            const month = currentDate.getMonth();
+                                            const year = currentDate.getFullYear(); const month = currentDate.getMonth();
                                             const first = (new Date(year, month, 1).getDay() + 6) % 7;
                                             const days = new Date(year, month + 1, 0).getDate();
                                             const grid = [];
@@ -430,26 +324,18 @@ const app = initializeApp(firebaseConfig);
                                                 const calc = calculateDaily(dStr, data);
                                                 const isF = (new Date(year, month, d).getDay() === 0 || new Date(year, month, d).getDay() === 6);
                                                 grid.push(
-                                                    <div key={d} onClick={() => handleDayClick(d)} className={`day-card h-28 md:h-36 border border-slate-200 p-1.5 cursor-pointer transition-all hover:bg-indigo-50 relative flex flex-col overflow-hidden ${isF ? 'bg-red-50/30' : 'bg-white'}`}>
+                                                    <div key={d} onClick={() => { setSelectedDay({ day: d, dateStr: dStr, ...data }); setIsModalOpen(true); }} className={`day-card h-28 md:h-36 border border-slate-200 p-1.5 cursor-pointer transition-all hover:bg-indigo-50 relative flex flex-col overflow-hidden ${isF ? 'bg-red-50/30' : 'bg-white'}`}>
                                                         <div className="flex justify-between items-start mb-1">
                                                             <span className={`text-[10px] font-black ${isF ? 'text-red-500' : 'text-slate-400'}`}>{d}</span>
                                                             <div className="flex items-center gap-1">
-                                                                {(data.shift || data.isReten) && (
-                                                                    <button 
-                                                                        onClick={(e) => clearDay(e, dStr)}
-                                                                        className="clear-btn p-1 text-slate-300 hover:text-red-500 transition-colors"
-                                                                        title="Borrar día"
-                                                                    >
-                                                                        <Icon name="trash-2" size={12} />
-                                                                    </button>
-                                                                )}
-                                                                {calc.total > 0 && <span className="text-[9px] font-black text-green-700 bg-green-100 px-1.5 py-0.5 rounded shadow-sm">{calc.total.toFixed(0)}€</span>}
+                                                                {(data.shift || data.isReten) && <button onClick={(e) => { e.stopPropagation(); const nd = {...shiftsData}; delete nd[dStr]; setShiftsData(nd); persist(nd, 'shifts'); }} className="clear-btn p-1 text-slate-300 hover:text-red-500"><Icon name="trash-2" size={12} /></button>}
+                                                                {calc.total > 0 && <span className="text-[9px] font-black text-green-700 bg-green-100 px-1.5 py-0.5 rounded">{calc.total.toFixed(0)}€</span>}
                                                             </div>
                                                         </div>
                                                         <div className="flex flex-col gap-0.5 flex-1 overflow-y-auto no-scrollbar">
-                                                            {data.isReten && <div className="text-[7px] bg-indigo-600 text-white font-black px-1 rounded text-center tracking-tighter uppercase">RETÉN</div>}
+                                                            {data.isReten && <div className="text-[7px] bg-indigo-600 text-white font-black px-1 rounded text-center">RETÉN</div>}
                                                             {data.shift && data.shift !== 'D' && <div className={`text-[8px] md:text-[9px] px-1 rounded font-black text-center ${SHIFTS.find(s => s.id === data.shift)?.color || 'bg-slate-100'}`}>{data.shift}</div>}
-                                                            {calc.details.map((v, i) => <div key={i} className="flex justify-between text-[6.5px] md:text-[7.5px] text-slate-500 font-bold leading-tight"><span className="truncate pr-1">{v.label}</span><span className="text-slate-800 shrink-0">{v.value.toFixed(0)}</span></div>)}
+                                                            {calc.details.map((v, i) => <div key={i} className="flex justify-between text-[6.5px] md:text-[7.5px] text-slate-500 font-bold"><span className="truncate pr-1">{v.label}</span><span>{v.value.toFixed(0)}</span></div>)}
                                                         </div>
                                                     </div>
                                                 );
@@ -459,79 +345,37 @@ const app = initializeApp(firebaseConfig);
                                     </div>
                                 </div>
                                 <div className="space-y-8">
-                                    <div className="bg-white p-8 md:p-10 rounded-[48px] shadow-2xl border border-slate-100 sticky top-8">
+                                    <div className="bg-white p-8 rounded-[48px] shadow-2xl border border-slate-100 sticky top-8">
                                         <h2 className="text-xl font-black mb-10 flex items-center gap-3"><Icon name="euro" className="text-indigo-600" />Balance Mes</h2>
                                         <div className="space-y-4">
                                             {Object.entries(monthSummary).map(([k, v]) => k !== 'total' && v > 0 && (
-                                                <div key={k} className="flex justify-between items-center"><span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{k}</span><span className="font-black text-slate-800 text-sm tracking-tight">{v.toLocaleString('es-ES', { minimumFractionDigits: 2 })}€</span></div>
+                                                <div key={k} className="flex justify-between items-center"><span className="text-slate-400 text-[10px] font-black uppercase">{k}</span><span className="font-black text-slate-800 text-sm">{v.toLocaleString('es-ES', { minimumFractionDigits: 2 })}€</span></div>
                                             ))}
                                             <div className="pt-8 mt-6 border-t-4 border-double border-slate-100 flex flex-col items-end">
-                                                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Variable Bruto</span>
-                                                <span className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter leading-none">{monthSummary.total.toLocaleString('es-ES', { minimumFractionDigits: 2 })}€</span>
+                                                <span className="text-[11px] font-black text-slate-400 uppercase mb-2">Total Variable Bruto</span>
+                                                <span className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">{monthSummary.total.toLocaleString('es-ES', { minimumFractionDigits: 2 })}€</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         ) : (
-                            /* Vista de Estadísticas Globales */
                             <div className="animate-in grid grid-cols-1 lg:grid-cols-2 gap-10">
-                                <div className="bg-white p-10 md:p-14 rounded-[56px] shadow-2xl border border-slate-100">
+                                <div className="bg-white p-10 rounded-[56px] shadow-2xl border border-slate-100">
                                     <h2 className="text-2xl font-black mb-12 flex items-center gap-4"><Icon name="pie-chart" className="text-indigo-600" />Distribución Total</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-                                        <div className="aspect-square relative">
-                                            <PieChart data={chartData} />
-                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase">Total Bruto</span>
-                                                <span className="text-xl font-black text-slate-900 tracking-tighter">{globalStats.total.toLocaleString('es-ES', { maximumFractionDigits: 0 })}€</span>
-                                            </div>
-                                        </div>
+                                        <div className="aspect-square relative"><PieChart data={[ { name: 'Plus TRC', value: globalStats.trc, color: '#6366f1' }, { name: 'Plus TRA', value: globalStats.tra, color: '#f59e0b' }, { name: 'Llamada', value: globalStats.llamada, color: '#ef4444' }, { name: 'Alim', value: globalStats.alim, color: '#10b981' }, { name: 'Km', value: globalStats.km, color: '#0ea5e9' }, { name: 'Extras', value: globalStats.extras, color: '#8b5cf6' }, { name: 'Noche', value: globalStats.nocturna, color: '#334155' }, { name: 'Retén', value: globalStats.reten, color: '#4f46e5' }, { name: 'Otros', value: globalStats.custom, color: '#94a3b8' } ]} /><div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"><span className="text-[10px] font-black text-slate-400 uppercase">Total</span><span className="text-xl font-black text-slate-900">{globalStats.total.toLocaleString('es-ES', { maximumFractionDigits: 0 })}€</span></div></div>
                                         <div className="space-y-4">
-                                            {chartData.map((item, idx) => item.value > 0 && (
-                                                <div key={idx} className="flex items-center gap-4">
-                                                    <div className="w-4 h-4 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: item.color }}></div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{item.name}</span>
-                                                        <span className="text-sm font-black text-slate-800 leading-none">{item.value.toLocaleString('es-ES', { minimumFractionDigits: 2 })}€</span>
-                                                    </div>
-                                                </div>
+                                            {[ { n: 'TRC', v: globalStats.trc, c: '#6366f1' }, { n: 'TRA', v: globalStats.tra, c: '#f59e0b' }, { n: 'Llamada', v: globalStats.llamada, c: '#ef4444' }, { n: 'Alim', v: globalStats.alim, c: '#10b981' }, { n: 'Km', v: globalStats.km, c: '#0ea5e9' }, { n: 'HE', v: globalStats.extras, c: '#8b5cf6' }, { n: 'Noche', v: globalStats.nocturna, c: '#334155' }, { n: 'Retén', v: globalStats.reten, c: '#4f46e5' } ].map((it, i) => it.v > 0 && (
+                                                <div key={i} className="flex items-center gap-4"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: it.c }}></div><div><span className="text-[9px] font-black text-slate-400 uppercase">{it.n}</span><p className="text-xs font-black text-slate-800">{it.v.toFixed(2)}€</p></div></div>
                                             ))}
                                         </div>
                                     </div>
                                 </div>
-
-                                <div className="space-y-8">
-                                    <div className="bg-slate-900 p-12 rounded-[56px] shadow-2xl text-white relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                                            <Icon name="trending-up" size={120} />
-                                        </div>
-                                        <h2 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Acumulado Histórico</h2>
-                                        <div className="relative z-10">
-                                            <p className="text-6xl md:text-8xl font-black tracking-tighter mb-4 leading-none">
-                                                {globalStats.total.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                                <span className="text-indigo-500 text-3xl md:text-5xl">€</span>
-                                            </p>
-                                            <p className="text-slate-400 font-bold text-sm uppercase tracking-widest max-w-xs">
-                                                Suma total de todos los conceptos variables registrados hasta la fecha.
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white p-10 rounded-[56px] shadow-xl border border-slate-100">
-                                        <h3 className="text-lg font-black mb-8 flex items-center gap-3 tracking-tight"><Icon name="award" className="text-indigo-600" />Hitos de Productividad</h3>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Máximo Mensual</p>
-                                                <p className="text-2xl font-black text-indigo-600">-- €</p>
-                                                <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 italic">Funcionalidad en desarrollo</p>
-                                            </div>
-                                            <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Media Estimada</p>
-                                                <p className="text-2xl font-black text-slate-800">{(globalStats.total / (Object.keys(shiftsData).length || 1) * 30).toLocaleString('es-ES', { maximumFractionDigits: 0 })}€</p>
-                                                <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Estimación /30 días</p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div className="bg-slate-900 p-12 rounded-[56px] shadow-2xl text-white">
+                                    <h2 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Acumulado Histórico</h2>
+                                    <p className="text-6xl md:text-8xl font-black tracking-tighter mb-4 leading-none">{globalStats.total.toLocaleString('es-ES', { maximumFractionDigits: 0 })}<span className="text-indigo-500 text-3xl">€</span></p>
+                                    <p className="text-slate-400 font-bold text-sm uppercase max-w-xs">Suma total registrada.</p>
                                 </div>
                             </div>
                         )}
@@ -539,96 +383,49 @@ const app = initializeApp(firebaseConfig);
 
                     {isSettingsOpen && (
                         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
-                            <div className="bg-white w-full max-w-xl rounded-[60px] shadow-2xl p-10 md:p-14 border border-white/20 overflow-y-auto max-h-[90vh]">
-                                <div className="flex justify-between items-center mb-10">
-                                    <h3 className="text-3xl font-black">Ajustes</h3>
-                                    <button onClick={() => signOut(auth)} className="flex items-center gap-2 p-3 bg-red-50 text-red-600 font-black text-[10px] uppercase rounded-2xl hover:bg-red-100">
-                                        <Icon name="log-out" size={16} /> Salir
-                                    </button>
+                            <div className="bg-white w-full max-w-xl rounded-[60px] p-10 md:p-14 border border-white/20">
+                                <div className="flex justify-between items-center mb-10"><h3 className="text-3xl font-black">Ajustes</h3><button onClick={() => signOut(auth)} className="flex items-center gap-2 p-3 bg-red-50 text-red-600 font-black text-[10px] uppercase rounded-2xl">Salir</button></div>
+                                <div className="space-y-8">
+                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Grupo</label><div className="grid grid-cols-4 gap-2">{Object.keys(SALARY_DATA).map(g => <button key={g} onClick={() => { const p = {...userProfile, group: g}; setUserProfile(p); persist(p, 'profile'); }} className={`py-4 rounded-3xl font-black text-sm border-2 ${userProfile.group === g ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{g}</button>)}</div></section>
+                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Nivel</label><div className="grid grid-cols-6 gap-2">{[...Array(12)].map((_, i) => { const lvl = String(i + 1); return <button key={lvl} onClick={() => { const p = {...userProfile, level: lvl}; setUserProfile(p); persist(p, 'profile'); }} className={`py-3 rounded-2xl font-black text-xs border-2 ${userProfile.level === lvl ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{lvl}</button>; })}</div></section>
+                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Kilometraje Centro</label><input type="number" className="w-full bg-slate-50 p-6 rounded-[32px] border-2 border-indigo-200 text-4xl font-black text-indigo-600" value={userProfile.kmCount} onChange={(e) => { const p = {...userProfile, kmCount: parseFloat(e.target.value) || 0}; setUserProfile(p); persist(p, 'profile'); }} /></section>
                                 </div>
-                                <div className="space-y-10">
-                                    <section>
-                                        <label className="text-[11px] font-black uppercase mb-4 block tracking-widest text-slate-400">Grupo Profesional</label>
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {Object.keys(SALARY_DATA).map(g => (
-                                                <button key={g} onClick={() => { const p = {...userProfile, group: g}; setUserProfile(p); persist(p, 'profile'); }} className={`py-4 rounded-3xl font-black text-sm border-2 transition-all ${userProfile.group === g ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-xl' : 'border-slate-100 text-slate-400'}`}>{g}</button>
-                                            ))}
-                                        </div>
-                                    </section>
-
-                                    <section>
-                                        <label className="text-[11px] font-black uppercase mb-4 block tracking-widest text-slate-400">Nivel Salarial</label>
-                                        <div className="grid grid-cols-6 gap-2">
-                                            {[...Array(12)].map((_, i) => {
-                                                const lvl = String(i + 1);
-                                                return (
-                                                    <button 
-                                                        key={lvl} 
-                                                        onClick={() => { const p = {...userProfile, level: lvl}; setUserProfile(p); persist(p, 'profile'); }} 
-                                                        className={`py-3 rounded-2xl font-black text-xs border-2 transition-all ${userProfile.level === lvl ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md' : 'border-slate-100 text-slate-400'}`}
-                                                    >
-                                                        {lvl}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </section>
-
-                                    <section>
-                                        <label className="text-[11px] font-black uppercase mb-4 block tracking-widest text-slate-400">Kilometraje Centro (Km)</label>
-                                        <input type="number" className="w-full bg-slate-50 p-6 rounded-[32px] border-2 border-indigo-200 outline-none text-4xl font-black text-indigo-600" value={userProfile.kmCount} onChange={(e) => { const p = {...userProfile, kmCount: parseFloat(e.target.value) || 0}; setUserProfile(p); persist(p, 'profile'); }} />
-                                    </section>
-                                </div>
-                                <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-10 py-6 bg-slate-900 text-white font-black rounded-[32px] uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all">Cerrar Ajustes</button>
+                                <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-10 py-6 bg-slate-900 text-white font-black rounded-[32px]">Cerrar</button>
                             </div>
                         </div>
                     )}
 
                     {isModalOpen && selectedDay && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
-                            <div className="bg-white w-full max-w-3xl rounded-[64px] shadow-2xl overflow-hidden border border-white/10 animate-in">
-                                <div className="bg-slate-900 p-10 md:p-12 text-white flex justify-between items-center">
-                                    <div><p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-2 italic">Configuración Jornada</p><h3 className="text-3xl md:text-5xl font-black tracking-tight">{new Date(selectedDay.dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</h3></div>
-                                    <button onClick={() => setIsModalOpen(false)} className="p-4 bg-white/10 rounded-[32px] hover:bg-white/20 transition-all"><Icon name="x" size={32} /></button>
-                                </div>
-                                <div className="p-8 md:p-12 max-h-[70vh] overflow-y-auto space-y-10 no-scrollbar">
-                                    <section><div onClick={() => { const r = !selectedDay.isReten; let c = selectedDay.activeConcepts || []; if (r) c = c.filter(i => i !== 'comp_llamada'); updateDay({...selectedDay, isReten: r, activeConcepts: c}); }} className={`p-6 rounded-[32px] border-4 flex items-center justify-between cursor-pointer transition-all ${selectedDay.isReten ? 'border-indigo-600 bg-indigo-50 shadow-xl' : 'border-slate-100 bg-slate-50 opacity-60'}`}><div className="flex items-center gap-4"><div className={`p-4 rounded-2xl ${selectedDay.isReten ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}><Icon name="shield-check" size={32} /></div><div><h4 className="text-lg font-black uppercase tracking-tight">Estado: Retén</h4></div></div><div className={`w-8 h-8 rounded-full border-4 transition-all ${selectedDay.isReten ? 'bg-indigo-600 border-indigo-200 scale-110' : 'bg-white border-slate-200'}`}></div></div></section>
-                                    
-                                    <section><label className="text-[11px] font-black uppercase mb-4 block text-slate-400 tracking-widest">Tipo de Turno</label><div className="grid grid-cols-5 gap-3">{SHIFTS.map(s => <button key={s.id} onClick={() => {
+                            <div className="bg-white w-full max-w-3xl rounded-[64px] shadow-2xl overflow-hidden animate-in">
+                                <div className="bg-slate-900 p-10 text-white flex justify-between items-center"><div><p className="text-indigo-400 text-[10px] font-black uppercase mb-2">Configuración</p><h3 className="text-3xl font-black">{new Date(selectedDay.dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</h3></div><button onClick={() => setIsModalOpen(false)} className="p-4 bg-white/10 rounded-[32px]"><Icon name="x" size={32} /></button></div>
+                                <div className="p-8 md:p-12 max-h-[65vh] overflow-y-auto space-y-8 no-scrollbar">
+                                    <section><div onClick={() => { const r = !selectedDay.isReten; let c = selectedDay.activeConcepts || []; if (r) c = c.filter(i => i !== 'comp_llamada'); const nd = {...selectedDay, isReten: r, activeConcepts: c}; setSelectedDay(nd); const ns = {...shiftsData, [nd.dateStr]: nd}; setShiftsData(ns); persist(ns, 'shifts'); }} className={`p-6 rounded-[32px] border-4 flex items-center justify-between cursor-pointer ${selectedDay.isReten ? 'border-indigo-600 bg-indigo-50' : 'border-slate-100 bg-slate-50 opacity-60'}`}><div className="flex items-center gap-4"><div className={`p-4 rounded-2xl ${selectedDay.isReten ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}><Icon name="shield-check" size={32} /></div><h4 className="text-lg font-black uppercase">Estado: Retén</h4></div><div className={`w-8 h-8 rounded-full border-4 ${selectedDay.isReten ? 'bg-indigo-600 border-indigo-200' : 'bg-white border-slate-200'}`}></div></div></section>
+                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Tipo de Turno</label><div className="grid grid-cols-5 gap-3">{SHIFTS.map(s => <button key={s.id} onClick={() => { 
                                         const d = new Date(selectedDay.dateStr); const f = (d.getDay() === 0 || d.getDay() === 6);
                                         const upd = { ...selectedDay, shift: s.id, activeConcepts: (['R7', 'R9'].includes(s.id) ? ['trc', 'plus_llamada', 'comp_llamada', 'comida', 'comp_km'] : ['S1', 'S3', 'S5'].includes(s.id) ? ['trc'] : ['R1', 'R3'].includes(s.id) ? ['tra'] : []), extras: (s.id === 'R7' || s.id === 'R9' ? (f ? 12 : 3.5) : 0), horasNocturnas: (['R9', 'S5'].includes(s.id) ? 8 : ['R3', 'S3'].includes(s.id) ? 1 : 0) };
-                                        updateDay(upd);
-                                    }} className={`py-4 rounded-3xl border-2 font-black text-xs transition-all ${selectedDay.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800 shadow-md' : 'border-slate-100 text-slate-400'}`}>{s.id}</button>)}</div></section>
-                                    
-                                    <section><label className="text-[11px] font-black uppercase mb-4 block text-slate-400 tracking-widest">Complementos</label><div className="grid grid-cols-2 md:grid-cols-3 gap-3">{STANDARD_CONCEPTS.map(c => {
-                                        const active = (selectedDay.activeConcepts || []).includes(c.id);
-                                        const forbidden = selectedDay.isReten && c.id === 'comp_llamada';
-                                        return (
-                                            <button key={c.id} disabled={forbidden} onClick={() => {
-                                                let curr = selectedDay.activeConcepts || [];
-                                                let next = curr.includes(c.id) ? curr.filter(i => i !== c.id) : [...curr, c.id];
-                                                if (c.id === 'plus_llamada') { if (next.includes('plus_llamada')) { if (!next.includes('comp_km')) next.push('comp_km'); } else { next = next.filter(i => i !== 'comp_km'); }}
-                                                updateDay({...selectedDay, activeConcepts: next});
-                                            }} className={`flex items-center gap-3 p-4 rounded-[24px] border-2 text-[10px] font-black uppercase transition-all ${active ? 'border-indigo-600 bg-indigo-50 text-indigo-800 shadow-sm' : 'border-slate-100 bg-slate-50 text-slate-400'} ${forbidden ? 'opacity-20 grayscale cursor-not-allowed' : ''}`}><Icon name={active ? "check-square" : "square"} size={18} />{c.label}</button>
-                                        );
+                                        setSelectedDay(upd); const ns = {...shiftsData, [upd.dateStr]: upd}; setShiftsData(ns); persist(ns, 'shifts');
+                                    }} className={`py-4 rounded-3xl border-2 font-black text-xs ${selectedDay.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-100 text-slate-400'}`}>{s.id}</button>)}</div></section>
+                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Complementos</label><div className="grid grid-cols-2 md:grid-cols-3 gap-3">{STANDARD_CONCEPTS.map(c => {
+                                        const active = (selectedDay.activeConcepts || []).includes(c.id); const forbidden = selectedDay.isReten && c.id === 'comp_llamada';
+                                        return <button key={c.id} disabled={forbidden} onClick={() => {
+                                            let curr = selectedDay.activeConcepts || []; let next = curr.includes(c.id) ? curr.filter(i => i !== c.id) : [...curr, c.id];
+                                            if (c.id === 'plus_llamada') { if (next.includes('plus_llamada')) { if (!next.includes('comp_km')) next.push('comp_km'); } else { next = next.filter(i => i !== 'comp_km'); }}
+                                            const upd = {...selectedDay, activeConcepts: next}; setSelectedDay(upd); const ns = {...shiftsData, [upd.dateStr]: upd}; setShiftsData(ns); persist(ns, 'shifts');
+                                        }} className={`flex items-center gap-3 p-4 rounded-[24px] border-2 text-[10px] font-black uppercase ${active ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-100 bg-slate-50 text-slate-400'} ${forbidden ? 'opacity-20 grayscale cursor-not-allowed' : ''}`}><Icon name={active ? "check-square" : "square"} size={18} />{c.label}</button>;
                                     })}</div></section>
-                                    
                                     <div className="grid grid-cols-2 gap-8">
-                                        <section><label className="text-[11px] font-black uppercase mb-3 block text-slate-400 flex items-center gap-2"><Icon name="clock" size={14} />Extras (Horas)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-6 rounded-[32px] border-2 border-slate-100 outline-none text-4xl font-black text-slate-800 focus:border-indigo-200" value={selectedDay.extras || 0} onChange={(e) => updateDay({...selectedDay, extras: parseFloat(e.target.value) || 0})} /></section>
-                                        <section><label className="text-[11px] font-black uppercase mb-3 block text-slate-400 flex items-center gap-2"><Icon name="moon" size={14} />Nocturna (Horas)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-6 rounded-[32px] border-2 border-slate-100 outline-none text-4xl font-black text-slate-800 focus:border-indigo-200" value={selectedDay.horasNocturnas || 0} onChange={(e) => updateDay({...selectedDay, horasNocturnas: parseFloat(e.target.value) || 0})} /></section>
+                                        <section><label className="text-[11px] font-black uppercase mb-3 block text-slate-400">Extras (h)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-6 rounded-[32px] border-2 border-slate-100 text-4xl font-black" value={selectedDay.extras || 0} onChange={(e) => { const upd = {...selectedDay, extras: parseFloat(e.target.value) || 0}; setSelectedDay(upd); const ns = {...shiftsData, [upd.dateStr]: upd}; setShiftsData(ns); persist(ns, 'shifts'); }} /></section>
+                                        <section><label className="text-[11px] font-black uppercase mb-3 block text-slate-400">Noche (h)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-6 rounded-[32px] border-2 border-slate-100 text-4xl font-black" value={selectedDay.horasNocturnas || 0} onChange={(e) => { const upd = {...selectedDay, horasNocturnas: parseFloat(e.target.value) || 0}; setSelectedDay(upd); const ns = {...shiftsData, [upd.dateStr]: upd}; setShiftsData(ns); persist(ns, 'shifts'); }} /></section>
                                     </div>
                                 </div>
-                                <div className="p-8 md:p-12 bg-slate-50 border-t-2 border-slate-100 flex justify-end gap-4">
-                                    <button onClick={(e) => { clearDay(e, selectedDay.dateStr); setIsModalOpen(false); }} className="px-8 py-6 bg-red-50 text-red-600 font-black rounded-[32px] uppercase tracking-widest text-sm hover:bg-red-100">Borrar Todo</button>
-                                    <button onClick={() => setIsModalOpen(false)} className="px-12 md:px-20 py-6 bg-slate-900 text-white font-black rounded-[32px] uppercase tracking-widest text-sm shadow-2xl hover:bg-slate-800 transition-all active:scale-95">Guardar</button>
-                                </div>
+                                <div className="p-8 md:p-12 bg-slate-50 border-t-2 border-slate-100 flex justify-end gap-4"><button onClick={() => { const nd = {...shiftsData}; delete nd[selectedDay.dateStr]; setShiftsData(nd); persist(nd, 'shifts'); setIsModalOpen(false); }} className="px-8 py-6 bg-red-50 text-red-600 font-black rounded-[32px] uppercase text-sm">Borrar</button><button onClick={() => setIsModalOpen(false)} className="px-12 md:px-20 py-6 bg-slate-900 text-white font-black rounded-[32px] uppercase text-sm">Guardar</button></div>
                             </div>
                         </div>
                     )}
                 </div>
             );
         };
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
