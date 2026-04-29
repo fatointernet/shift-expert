@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANAV ShiftExpert v5.6</title>
+    <title>ANAV ShiftExpert v6.0 - Sistema de Compensación</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -11,13 +11,13 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         input[type="number"]::-webkit-inner-spin-button, 
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        .animate-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.25s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .day-card .clear-btn { opacity: 0; transition: opacity 0.2s; }
         .day-card:hover .clear-btn { opacity: 1; }
     </style>
@@ -26,8 +26,9 @@
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo, useCallback } = React;
 
+        // --- FIREBASE INFRASTRUCTURE ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
@@ -44,389 +45,565 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = 'anav-shift-calc-v5';
+        const APP_ID = 'anav-shift-calc-v5';
 
         const SALARY_DATA = {
-            "G I": { "1-9": { hora_extra: 106.34, nocturna: 8.75, plus_llamada: 134.98, reten_l: 62.47, reten_f: 108.35 }, "10-12": { hora_extra: 119.26, nocturna: 9.80, plus_llamada: 147.54, reten_l: 64.31, reten_f: 115.20 } },
-            "G II": { "1-9": { hora_extra: 84.49, nocturna: 6.95, plus_llamada: 113.97, reten_l: 59.86, reten_f: 102.15 }, "10-12": { hora_extra: 94.79, nocturna: 7.80, plus_llamada: 123.86, reten_l: 60.80, reten_f: 108.40 } },
-            "G III": { "1-9": { hora_extra: 69.90, nocturna: 5.75, plus_llamada: 98.81, reten_l: 58.07, reten_f: 98.60 }, "10-12": { hora_extra: 75.34, nocturna: 6.20, plus_llamada: 105.42, reten_l: 59.86, reten_f: 102.30 } },
-            "G IV": { "1-9": { hora_extra: 58.31, nocturna: 4.80, plus_llamada: 85.12, reten_l: 57.23, reten_f: 95.10 }, "10-12": { hora_extra: 63.82, nocturna: 5.25, plus_llamada: 92.45, reten_l: 57.23, reten_f: 95.10 } },
-            "G V": { "1-9": { hora_extra: 49.79, nocturna: 4.11, plus_llamada: 74.64, reten_l: 55.48, reten_f: 92.15 }, "10-12": { hora_extra: 49.79, nocturna: 4.11, plus_llamada: 74.64, reten_l: 55.48, reten_f: 92.15 } },
-            "G VI": { "1-9": { hora_extra: 43.12, nocturna: 3.55, plus_llamada: 68.20, reten_l: 53.10, reten_f: 88.40 }, "10-12": { hora_extra: 43.12, nocturna: 3.55, plus_llamada: 68.20, reten_l: 53.10, reten_f: 88.40 } },
-            "G VII": { "1-9": { hora_extra: 38.50, nocturna: 3.15, plus_llamada: 62.15, reten_l: 51.20, reten_f: 85.00 }, "10-12": { hora_extra: 38.50, nocturna: 3.15, plus_llamada: 62.15, reten_l: 51.20, reten_f: 85.00 } }
+            "G I": { "1-9": { extra: 106.34, night: 8.75, call: 134.98, r_l: 62.47, r_f: 108.35 }, "10-12": { extra: 119.26, night: 9.80, call: 147.54, r_l: 64.31, r_f: 115.20 } },
+            "G II": { "1-9": { extra: 84.49, night: 6.95, call: 113.97, r_l: 59.86, r_f: 102.15 }, "10-12": { extra: 94.79, night: 7.80, call: 123.86, r_l: 60.80, r_f: 108.40 } },
+            "G III": { "1-9": { extra: 69.90, night: 5.75, call: 98.81, r_l: 58.07, r_f: 98.60 }, "10-12": { extra: 75.34, night: 6.20, call: 105.42, r_l: 59.86, r_f: 102.30 } },
+            "G IV": { "1-9": { extra: 58.31, night: 4.80, call: 85.12, r_l: 57.23, r_f: 95.10 }, "10-12": { extra: 63.82, night: 5.25, call: 92.45, r_l: 57.23, r_f: 95.10 } },
+            "G V": { "1-9": { extra: 49.79, night: 4.11, call: 74.64, r_l: 55.48, r_f: 92.15 }, "10-12": { extra: 49.79, night: 4.11, call: 74.64, r_l: 55.48, r_f: 92.15 } },
+            "G VI": { "1-9": { extra: 43.12, night: 3.55, call: 68.20, r_l: 53.10, r_f: 88.40 }, "10-12": { extra: 43.12, night: 3.55, call: 68.20, r_l: 53.10, r_f: 88.40 } },
+            "G VII": { "1-9": { extra: 38.50, night: 3.15, call: 62.15, r_l: 51.20, r_f: 85.00 }, "10-12": { extra: 38.50, night: 3.15, call: 62.15, r_l: 51.20, r_f: 85.00 } }
         };
 
-        const CONSTANTS = { TRC_UNIT: 55.01, TRA_UNIT: 20.90, COMP_LLAMADA_L: 54.47, COMP_LLAMADA_F: 98.35, ALIMENTACION: 40.69, PRECIO_KM: 0.55 };
+        const GLOBAL_CONST = { TRC: 55.01, TRA: 20.90, CALL_L: 54.47, CALL_F: 98.35, FOOD: 40.69, KM_PRICE: 0.55 };
 
         const SHIFTS = [
-            { id: 'D', name: 'Descanso', color: 'bg-gray-100 text-gray-400' },
-            { id: 'P1', name: 'P1 Partida', color: 'bg-slate-200 text-slate-700' },
-            { id: 'I7', name: 'I7 Ordinaria', color: 'bg-slate-200 text-slate-700' },
-            { id: 'R1', name: 'R1 Abierto Mañana', color: 'bg-yellow-100 text-yellow-800' },
-            { id: 'R3', name: 'R3 Abierto Tarde', color: 'bg-yellow-200 text-yellow-900' },
-            { id: 'R7', name: 'R7 12h Día', color: 'bg-pink-100 text-pink-800' },
-            { id: 'R9', name: 'R9 12h Noche', color: 'bg-blue-100 text-blue-800' },
-            { id: 'S1', name: 'S1 Cerrado Mañana', color: 'bg-orange-100 text-orange-800' },
-            { id: 'S3', name: 'S3 Cerrado Tarde 2', color: 'bg-green-100 text-green-800' },
-            { id: 'S5', name: 'S5 Cerrado Noche', color: 'bg-purple-100 text-purple-800' },
+            { id: 'D', color: 'bg-gray-100 text-gray-400' },
+            { id: 'P1', color: 'bg-slate-200 text-slate-700' },
+            { id: 'I7', color: 'bg-slate-200 text-slate-700' },
+            { id: 'R1', color: 'bg-yellow-100 text-yellow-800' },
+            { id: 'R3', color: 'bg-yellow-200 text-yellow-900' },
+            { id: 'R7', color: 'bg-pink-100 text-pink-800' },
+            { id: 'R9', color: 'bg-blue-100 text-blue-800' },
+            { id: 'S1', color: 'bg-orange-100 text-orange-800' },
+            { id: 'S3', color: 'bg-green-100 text-green-800' },
+            { id: 'S5', color: 'bg-purple-100 text-purple-800' },
         ];
 
-        const STANDARD_CONCEPTS = [
-            { id: 'trc', label: 'Plus TRC' }, { id: 'tra', label: 'Plus TRA' }, { id: 'plus_llamada', label: 'Plus Llamada' }, { id: 'comp_llamada', label: 'Comp. Llamada' }, { id: 'comida', label: 'Ayuda Comida' }, { id: 'comp_km', label: 'Comp. Kilometraje' }
-        ];
+        const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-        const toLocalISO = (date) => {
-            const d = new Date(date);
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        };
-
-        const Icon = ({ name, size = 20, className = "" }) => {
+        const Icon = React.memo(({ name, size = 20, className = "" }) => {
             useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons({ attrs: { stroke: 'currentColor', 'stroke-width': 2 }, nameAttr: 'data-lucide' });
-                }
+                if (window.lucide) window.lucide.createIcons();
             }, [name]);
             return <span className={`inline-flex items-center justify-center ${className}`}><i data-lucide={name} style={{ width: size, height: size }}></i></span>;
-        };
+        });
 
         const PieChart = ({ data }) => {
-            const total = data.reduce((acc, item) => acc + item.value, 0);
-            let currentAngle = 0;
-            if (total === 0) return <div className="flex items-center justify-center h-64 bg-slate-50 rounded-full border-4 border-dashed border-slate-200"><p className="text-slate-400 font-bold uppercase text-xs">Sin datos</p></div>;
+            const total = useMemo(() => data.reduce((acc, item) => acc + item.value, 0), [data]);
+            let cumulativeAngle = 0;
+            if (total <= 0) return <div className="flex items-center justify-center h-64 bg-slate-100 rounded-full border-4 border-dashed border-slate-200"><p className="text-slate-400 font-bold uppercase text-[10px]">Sin Datos</p></div>;
             return (
                 <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
                     {data.map((item, index) => {
-                        if (item.value === 0) return null;
-                        const sliceAngle = (item.value / total) * 360;
-                        const x1 = 50 + 40 * Math.cos((Math.PI * currentAngle) / 180);
-                        const y1 = 50 + 40 * Math.sin((Math.PI * currentAngle) / 180);
-                        currentAngle += sliceAngle;
-                        const x2 = 50 + 40 * Math.cos((Math.PI * currentAngle) / 180);
-                        const y2 = 50 + 40 * Math.sin((Math.PI * currentAngle) / 180);
-                        const largeArcFlag = sliceAngle > 180 ? 1 : 0;
-                        return <path key={index} d={`M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2} Z`} fill={item.color} className="hover:opacity-80 transition-opacity cursor-pointer" />;
+                        if (item.value <= 0) return null;
+                        const angle = (item.value / total) * 360;
+                        const x1 = 50 + 40 * Math.cos((Math.PI * cumulativeAngle) / 180);
+                        const y1 = 50 + 40 * Math.sin((Math.PI * cumulativeAngle) / 180);
+                        cumulativeAngle += angle;
+                        const x2 = 50 + 40 * Math.cos((Math.PI * cumulativeAngle) / 180);
+                        const y2 = 50 + 40 * Math.sin((Math.PI * cumulativeAngle) / 180);
+                        return <path key={index} d={`M 50 50 L ${x1} ${y1} A 40 40 0 ${angle > 180 ? 1 : 0} 1 ${x2} ${y2} Z`} fill={item.color} className="hover:brightness-90 transition-all cursor-pointer" />;
                     })}
-                    <circle cx="50" cy="50" r="20" fill="white" />
+                    <circle cx="50" cy="50" r="22" fill="white" />
                 </svg>
             );
         };
 
         const App = () => {
             const [user, setUser] = useState(null);
-            const [authLoading, setAuthLoading] = useState(true);
-            const [currentDate, setCurrentDate] = useState(new Date());
-            const [shiftsData, setShiftsData] = useState({});
-            const [userProfile, setUserProfile] = useState({ group: "G V", level: "7", kmCount: 46 });
-            const [selectedDay, setSelectedDay] = useState(null);
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-            const [activeTab, setActiveTab] = useState('calendar');
-            const [authEmail, setAuthEmail] = useState('');
-            const [authPassword, setAuthPassword] = useState('');
-            const [isRegisterMode, setIsRegisterMode] = useState(false);
-            const [isResetMode, setIsResetMode] = useState(false);
-            const [authError, setAuthError] = useState('');
-            const [resetSuccess, setResetSuccess] = useState(false);
+            const [loading, setLoading] = useState(true);
+            const [viewDate, setViewDate] = useState(new Date());
+            const [shifts, setShifts] = useState({});
+            const [profile, setProfile] = useState({ group: "G V", level: "7", kmCount: 46 });
+            const [selected, setSelected] = useState(null);
+            const [ui, setUi] = useState({ modal: false, settings: false, tab: 'calendar', error: '' });
+            const [authFields, setAuthFields] = useState({ email: '', pass: '', mode: 'login', reset: false });
+
+            const save = useCallback(async (data, path) => {
+                if (!user) return;
+                try {
+                    await setDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', path), { data, updatedAt: Date.now() });
+                } catch (e) { setUi(prev => ({ ...prev, error: 'Error de sincronización' })); }
+            }, [user]);
 
             useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (u) => {
-                    setUser(u);
-                    setAuthLoading(false);
-                });
-                return () => unsubscribe();
+                const unsubAuth = onAuthStateChanged(auth, (u) => { setUser(u); setLoading(false); });
+                return () => unsubAuth();
             }, []);
 
             useEffect(() => {
                 if (!user) return;
-                const unsubShifts = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'shifts'), (snap) => {
-                    if (snap.exists()) setShiftsData(snap.data().data || {});
-                });
-                const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile'), (snap) => {
-                    if (snap.exists()) setUserProfile(prev => ({ ...prev, ...snap.data() }));
-                });
+                const unsubShifts = onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'shifts'), snap => snap.exists() && setShifts(snap.data().data || {}));
+                const unsubProfile = onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'profile'), snap => snap.exists() && setProfile(p => ({ ...p, ...snap.data().data })));
                 return () => { unsubShifts(); unsubProfile(); };
             }, [user]);
 
-            const activeConstants = useMemo(() => {
-                const groupData = SALARY_DATA[userProfile.group];
-                const levelKey = parseInt(userProfile.level) <= 9 ? "1-9" : "10-12";
-                return groupData?.[levelKey] || SALARY_DATA["G V"]["1-9"];
-            }, [userProfile]);
+            const rates = useMemo(() => {
+                const g = SALARY_DATA[profile.group] || SALARY_DATA["G V"];
+                return g[parseInt(profile.level) <= 9 ? "1-9" : "10-12"];
+            }, [profile]);
 
-            const persist = async (newData, path) => {
-                if (!user) return;
-                try { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'data', path), { data: newData, updatedAt: Date.now() });
-                } catch (e) { console.error("Error persistencia", e); }
-            };
-
-            const calculateDaily = (dateStr, data = {}) => {
-                const shiftId = data.shift;
-                const activeConcepts = data.activeConcepts || [];
-                const manualConcepts = data.manualConcepts || [];
-                const isReten = data.isReten || false;
-                if (!shiftId && !isReten && manualConcepts.length === 0) return { total: 0, details: [] };
-                const date = new Date(dateStr);
-                const festive = date.getDay() === 0 || date.getDay() === 6;
-                const results = { total: 0, details: [] };
-                const add = (label, value, iconType) => { 
-                    const val = parseFloat(value);
-                    if (!isNaN(val) && val > 0) { results.total += val; results.details.push({ label, value: val, iconType }); }
+            const calcDay = useCallback((dateStr, data) => {
+                if (!data) return { total: 0, restHours: 0, items: [] };
+                const d = new Date(dateStr);
+                const isF = d.getDay() === 0 || d.getDay() === 6;
+                const res = { total: 0, restHours: 0, items: [] };
+                const add = (label, val, type) => {
+                    const v = parseFloat(val);
+                    if (v > 0) { res.total += v; res.items.push({ label, value: v, type }); }
                 };
-                if (isReten) add(`Retén ${festive ? 'F' : 'L'}`, festive ? activeConstants.reten_f : activeConstants.reten_l, 'shield');
-                activeConcepts.forEach(cid => {
-                    switch(cid) {
-                        case 'trc':
-                            let trcMult = (shiftId === 'R7') ? 1.5 : (shiftId === 'R9') ? 2.5 : ['S3', 'S5'].includes(shiftId) ? (festive ? 3 : 2) : ['S1'].includes(shiftId) ? (festive ? 2 : 1) : 1;
-                            add(`Plus TRC (${trcMult}x)`, CONSTANTS.TRC_UNIT * trcMult, 'trc'); break;
-                        case 'tra': add(`Plus TRA (${festive ? 3 : 2}x)`, CONSTANTS.TRA_UNIT * (festive ? 3 : 2), 'tra'); break;
-                        case 'plus_llamada': add('Plus Llamada', activeConstants.plus_llamada, 'phone'); break;
-                        case 'comp_llamada': if (!isReten) add(`Comp. Llamada ${festive ? 'F' : 'L'}`, festive ? CONSTANTS.COMP_LLAMADA_F : CONSTANTS.COMP_LLAMADA_L, 'phone'); break;
-                        case 'comida': add('Ayuda Comida', CONSTANTS.ALIMENTACION, 'food'); break;
-                        case 'comp_km': if (activeConcepts.includes('plus_llamada')) add('Kilometraje', (userProfile.kmCount || 0) * CONSTANTS.PRECIO_KM, 'map'); break;
+
+                if (data.isReten) add(`Retén ${isF ? 'F' : 'L'}`, isF ? rates.r_f : rates.r_l, 'shield');
+                
+                const concepts = data.activeConceptsCount || {};
+                
+                Object.entries(concepts).forEach(([id, count]) => {
+                    if (count <= 0) return;
+                    if (id === 'trc') {
+                        const m = data.shift === 'R7' ? 1.5 : data.shift === 'R9' ? 2.5 : ['S3', 'S5'].includes(data.shift) ? (isF ? 3 : 2) : ['S1'].includes(data.shift) ? (isF ? 2 : 1) : 1;
+                        add(`Plus TRC ${m}x (x${count})`, (GLOBAL_CONST.TRC * m) * count, 'trc');
+                    }
+                    if (id === 'tra') add(`Plus TRA ${isF ? 3 : 2}x (x${count})`, (GLOBAL_CONST.TRA * (isF ? 3 : 2)) * count, 'tra');
+                    if (id === 'plus_llamada') add(`Plus Llamada (x${count})`, rates.call * count, 'phone');
+                    if (id === 'comp_llamada' && !data.isReten) add(`Comp. Llamada (x${count})`, (isF ? GLOBAL_CONST.CALL_F : GLOBAL_CONST.CALL_L) * count, 'phone');
+                    if (id === 'comida') add(`Ayuda Comida (x${count})`, GLOBAL_CONST.FOOD * count, 'food');
+                    if (id === 'comp_km') {
+                        const totalKm = (profile.kmCount * count) + (parseFloat(data.extraKm) || 0);
+                        add(`Kilometraje (${totalKm}km)`, totalKm * GLOBAL_CONST.KM_PRICE, 'map');
                     }
                 });
-                if (shiftId && shiftId !== 'D') {
-                    const finalExtras = parseFloat(data.extras) || (shiftId === 'R7' || shiftId === 'R9' ? (festive ? 12 : 3.5) : 0);
-                    if (finalExtras > 0) add(`HE ${finalExtras}h`, finalExtras * activeConstants.hora_extra, 'clock');
-                    const nightHrs = parseFloat(data.horasNocturnas) || (['R9', 'S5'].includes(shiftId) ? 8 : ['R3', 'S3'].includes(shiftId) ? 1 : 0);
-                    if (nightHrs > 0) add(`Nocturna ${nightHrs}h`, nightHrs * activeConstants.nocturna, 'moon');
-                }
-                manualConcepts.forEach(c => add(c.label, c.value, 'custom'));
-                return results;
-            };
 
-            const monthSummary = useMemo(() => {
-                let total = 0;
-                const items = { trc: 0, tra: 0, llamada: 0, alim: 0, km: 0, extras: 0, nocturna: 0, reten: 0, custom: 0 };
-                Object.entries(shiftsData).forEach(([dateStr, data]) => {
-                    const [y, m] = dateStr.split('-');
-                    if (parseInt(y) === currentDate.getFullYear() && parseInt(m) === (currentDate.getMonth() + 1)) {
-                        const calc = calculateDaily(dateStr, data); 
-                        total += calc.total;
-                        calc.details.forEach(d => {
-                            if (items[d.iconType] !== undefined) items[d.iconType] += d.value;
-                            else if (['phone'].includes(d.iconType)) items.llamada += d.value;
-                            else if (['food'].includes(d.iconType)) items.alim += d.value;
-                            else if (['map'].includes(d.iconType)) items.km += d.value;
-                            else if (['clock'].includes(d.iconType)) items.extras += d.value;
-                            else if (['moon'].includes(d.iconType)) items.nocturna += d.value;
-                            else if (['shield'].includes(d.iconType)) items.reten += d.value;
-                            else items.custom += d.value;
+                // --- OVERTIME COMPENSATION LOGIC ---
+                if (data.shift && data.shift !== 'D') {
+                    const h = parseFloat(data.extras) || 0;
+                    if (h > 0) {
+                        const isNightOrFestive = isF || (parseFloat(data.horasNocturnas) > 0);
+                        const compMode = data.extraCompMode || 'money'; // money, rest_total, mixed
+
+                        if (isNightOrFestive) {
+                            if (compMode === 'rest_total') {
+                                res.restHours += h * 2;
+                                res.items.push({ label: `HE Descanso (2x)`, value: h * 2, type: 'coffee' });
+                            } else {
+                                add(`HE ${h}h (2.0)`, h * rates.extra, 'clock');
+                            }
+                        } else {
+                            // Laboral Days
+                            if (compMode === 'rest_total') {
+                                res.restHours += h * 1.75;
+                                res.items.push({ label: `HE Descanso (1.75x)`, value: h * 1.75, type: 'coffee' });
+                            } else if (compMode === 'mixed') {
+                                res.restHours += h * 1;
+                                add(`HE Parte Pago (0.75x)`, h * rates.extra * 0.75, 'clock');
+                                res.items.push({ label: `HE Descanso (1x)`, value: h * 1, type: 'coffee' });
+                            } else {
+                                add(`HE ${h}h (Laboral)`, h * rates.extra, 'clock');
+                            }
+                        }
+                    }
+                    
+                    const n = parseFloat(data.horasNocturnas) || 0;
+                    if (n > 0) add(`Nocturnidad ${n}h`, n * rates.night, 'moon');
+                }
+                return res;
+            }, [rates, profile.kmCount]);
+
+            const stats = useMemo(() => {
+                const s = { 
+                    month: { total: 0, trc: 0, tra: 0, call: 0, food: 0, km: 0, he: 0, night: 0, reten: 0, restHours: 0 }, 
+                    global: { total: 0, restHours: 0 } 
+                };
+                Object.entries(shifts).forEach(([ds, data]) => {
+                    const c = calcDay(ds, data);
+                    s.global.total += c.total;
+                    s.global.restHours += c.restHours;
+                    const [y, m] = ds.split('-').map(Number);
+                    if (y === viewDate.getFullYear() && m === (viewDate.getMonth() + 1)) {
+                        s.month.total += c.total;
+                        s.month.restHours += c.restHours;
+                        c.items.forEach(i => {
+                            if (i.type === 'trc') s.month.trc += i.value;
+                            else if (i.type === 'tra') s.month.tra += i.value;
+                            else if (i.type === 'phone') s.month.call += i.value;
+                            else if (i.type === 'food') s.month.food += i.value;
+                            else if (i.type === 'map') s.month.km += i.value;
+                            else if (i.type === 'clock') s.month.he += i.value;
+                            else if (i.type === 'moon') s.month.night += i.value;
+                            else if (i.type === 'shield') s.month.reten += i.value;
                         });
                     }
                 });
-                return { total, ...items };
-            }, [shiftsData, currentDate, activeConstants, userProfile.kmCount]);
-
-            const globalStats = useMemo(() => {
-                const global = { trc: 0, tra: 0, llamada: 0, alim: 0, km: 0, extras: 0, nocturna: 0, reten: 0, custom: 0, total: 0 };
-                Object.entries(shiftsData).forEach(([dateStr, data]) => {
-                    const calc = calculateDaily(dateStr, data);
-                    global.total += calc.total;
-                    calc.details.forEach(d => {
-                        if (global[d.iconType] !== undefined) global[d.iconType] += d.value;
-                        else if (['phone'].includes(d.iconType)) global.llamada += d.value;
-                        else if (['food'].includes(d.iconType)) global.alim += d.value;
-                        else if (['map'].includes(d.iconType)) global.km += d.value;
-                        else if (['clock'].includes(d.iconType)) global.extras += d.value;
-                        else if (['moon'].includes(d.iconType)) global.nocturna += d.value;
-                        else if (['shield'].includes(d.iconType)) global.reten += d.value;
-                        else global.custom += d.value;
-                    });
-                });
-                return global;
-            }, [shiftsData, activeConstants, userProfile.kmCount]);
+                return s;
+            }, [shifts, viewDate, calcDay]);
 
             const handleAuth = async (e) => {
                 e.preventDefault();
-                setAuthError('');
+                setUi(p => ({ ...p, error: '' }));
                 try {
-                    if (isResetMode) { await sendPasswordResetEmail(auth, authEmail); setResetSuccess(true); }
-                    else if (isRegisterMode) { await createUserWithEmailAndPassword(auth, authEmail, authPassword); }
-                    else { await signInWithEmailAndPassword(auth, authEmail, authPassword); }
-                } catch (err) { setAuthError("Error: verifica tus datos"); }
+                    if (authFields.reset) { await sendPasswordResetEmail(auth, authFields.email); setAuthFields(p => ({ ...p, resetDone: true })); }
+                    else if (authFields.mode === 'register') { await createUserWithEmailAndPassword(auth, authFields.email, authFields.pass); }
+                    else { await signInWithEmailAndPassword(auth, authFields.email, authFields.pass); }
+                } catch (err) { setUi(p => ({ ...p, error: 'Credenciales inválidas' })); }
             };
 
-            if (authLoading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>;
+            const updateSelectedConcept = (id, delta) => {
+                const currentCount = selected.activeConceptsCount?.[id] || 0;
+                const nextCount = Math.max(0, currentCount + delta);
+                const upd = { 
+                    ...selected, 
+                    activeConceptsCount: { ...(selected.activeConceptsCount || {}), [id]: nextCount } 
+                };
+                setSelected(upd);
+                const ns = { ...shifts, [upd.ds]: upd };
+                setShifts(ns);
+                save(ns, 'shifts');
+            };
+
+            if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>;
 
             if (!user) return (
                 <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 antialiased">
-                    <div className="bg-slate-900 w-full max-w-md rounded-[48px] shadow-2xl p-10 border border-slate-800 animate-in">
-                        <div className="flex flex-col items-center mb-10 text-white">
-                            <Icon name="calendar" size={48} className="text-indigo-500 mb-4" />
-                            <h1 className="text-3xl font-black">ANAV ShiftExpert</h1>
-                        </div>
-                        <form onSubmit={handleAuth} className="space-y-6">
-                            <input type="email" required className="w-full bg-slate-800 p-5 rounded-3xl outline-none text-white font-bold border border-slate-700" placeholder="Email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
-                            {!isResetMode && <input type="password" required className="w-full bg-slate-800 p-5 rounded-3xl outline-none text-white font-bold border border-slate-700" placeholder="Contraseña" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />}
-                            {authError && <div className="text-red-400 text-xs font-black text-center uppercase tracking-tighter">{authError}</div>}
-                            {resetSuccess && <div className="text-green-400 text-xs font-black text-center uppercase">Enlace enviado</div>}
-                            <button type="submit" className="w-full py-6 bg-indigo-600 text-white font-black rounded-3xl uppercase tracking-widest">{isResetMode ? 'Enviar Enlace' : isRegisterMode ? 'Crear' : 'Entrar'}</button>
+                    <div className="bg-slate-900 w-full max-w-sm rounded-[40px] shadow-2xl p-10 border border-slate-800 animate-in">
+                        <div className="flex flex-col items-center mb-10"><Icon name="calendar" size={40} className="text-indigo-500 mb-4" /><h1 className="text-2xl font-black text-white">ShiftExpert</h1></div>
+                        <form onSubmit={handleAuth} className="space-y-4">
+                            <input type="email" required className="w-full bg-slate-800 p-4 rounded-2xl outline-none text-white text-sm border border-slate-700" placeholder="Email" value={authFields.email} onChange={e => setAuthFields({...authFields, email: e.target.value})} />
+                            {!authFields.reset && <input type="password" required className="w-full bg-slate-800 p-4 rounded-2xl outline-none text-white text-sm border border-slate-700" placeholder="Password" value={authFields.pass} onChange={e => setAuthFields({...authFields, pass: e.target.value})} />}
+                            {ui.error && <p className="text-red-400 text-[10px] font-bold text-center uppercase">{ui.error}</p>}
+                            {authFields.resetDone && <p className="text-green-400 text-[10px] font-bold text-center uppercase">Email enviado</p>}
+                            <button type="submit" className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase text-xs tracking-widest">{authFields.reset ? 'Resetear' : authFields.mode === 'login' ? 'Entrar' : 'Crear Cuenta'}</button>
                         </form>
-                        <div className="mt-8 flex flex-col items-center gap-4 text-slate-400 font-bold text-xs uppercase">
-                            <button onClick={() => {setIsResetMode(!isResetMode); setAuthError('');}}>{isResetMode ? 'Volver' : '¿Olvidaste tu contraseña?'}</button>
-                            {!isResetMode && <button onClick={() => {setIsRegisterMode(!isRegisterMode); setAuthError('');}}>{isRegisterMode ? 'Entrar' : 'Registrarse'}</button>}
+                        <div className="mt-6 flex flex-col items-center gap-3 text-slate-500 font-bold text-[10px] uppercase">
+                            <button onClick={() => setAuthFields({...authFields, reset: !authFields.reset})}>{authFields.reset ? 'Volver' : '¿Olvidaste la clave?'}</button>
+                            <button onClick={() => setAuthFields({...authFields, mode: authFields.mode === 'login' ? 'register' : 'login'})}>{authFields.mode === 'login' ? 'Registrarse' : 'Ya tengo cuenta'}</button>
                         </div>
                     </div>
                 </div>
             );
 
             return (
-                <div className="min-h-screen bg-slate-50 p-4 md:p-8 animate-in pb-24 md:pb-8">
-                    <div className="max-w-7xl mx-auto mb-10 space-y-8">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                            <div className="flex items-center gap-6">
-                                <div className="bg-indigo-600 p-5 rounded-[28px] shadow-2xl text-white"><Icon name="calendar" size={32} /></div>
+                <div className="min-h-screen bg-slate-50 pb-20 md:pb-10">
+                    {/* Header */}
+                    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-lg"><Icon name="calendar" size={24} /></div>
                                 <div>
-                                    <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">ANAV ShiftExpert</h1>
-                                    <div className="flex items-center gap-2">
-                                        <div onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase cursor-pointer hover:bg-indigo-100 bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100">
-                                            <Icon name="user" size={14} /> {user.email?.split('@')[0]} <Icon name="settings" size={14} />
-                                        </div>
-                                        <button onClick={() => signOut(auth)} className="flex items-center gap-2 text-red-600 font-black text-[10px] uppercase cursor-pointer hover:bg-red-100 bg-red-50 px-4 py-1.5 rounded-full border border-red-100">
-                                            <Icon name="log-out" size={14} /> Salir
-                                        </button>
+                                    <h2 className="text-xl font-black text-slate-900 tracking-tight">ShiftExpert</h2>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setUi({...ui, settings: true})} className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 hover:bg-indigo-100 transition-colors">Ajustes</button>
+                                        <button onClick={() => signOut(auth)} className="text-[9px] font-black uppercase text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-100 hover:bg-red-100 transition-colors">Salir</button>
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex bg-white p-1.5 rounded-[24px] shadow-xl border border-slate-100 font-black uppercase text-[10px] tracking-widest">
-                                <button onClick={() => setActiveTab('calendar')} className={`px-8 py-3 rounded-[18px] transition-all flex items-center gap-2 ${activeTab === 'calendar' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}><Icon name="calendar" size={14} /> Calendario</button>
-                                <button onClick={() => setActiveTab('stats')} className={`px-8 py-3 rounded-[18px] transition-all flex items-center gap-2 ${activeTab === 'stats' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}><Icon name="pie-chart" size={14} /> Estadísticas</button>
+                            <div className="flex bg-white p-1 rounded-2xl shadow-md border border-slate-100">
+                                <button onClick={() => setUi({...ui, tab: 'calendar'})} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${ui.tab === 'calendar' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}>Calendario</button>
+                                <button onClick={() => setUi({...ui, tab: 'stats'})} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${ui.tab === 'stats' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}>Stats</button>
                             </div>
                         </div>
-                        {activeTab === 'calendar' && (
+
+                        {ui.tab === 'calendar' && (
                             <div className="flex justify-center">
-                                <div className="flex items-center bg-white shadow-2xl border border-slate-100 rounded-[32px] p-2.5">
-                                    <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} className="p-3.5 hover:bg-slate-50 rounded-2xl"><Icon name="chevron-left" /></button>
-                                    <div className="px-6 md:px-10 font-black text-slate-800 min-w-[200px] text-center capitalize text-xl md:text-2xl tracking-tight">{currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</div>
-                                    <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} className="p-3.5 hover:bg-slate-50 rounded-2xl"><Icon name="chevron-right" /></button>
+                                <div className="flex items-center bg-white shadow-xl border border-slate-100 rounded-full p-1">
+                                    <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))} className="p-3 hover:bg-slate-50 rounded-full transition-colors"><Icon name="chevron-left" /></button>
+                                    <span className="px-6 font-black text-slate-800 capitalize min-w-[150px] text-center text-sm">{viewDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
+                                    <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))} className="p-3 hover:bg-slate-50 rounded-full transition-colors"><Icon name="chevron-right" /></button>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="max-w-7xl mx-auto">
-                        {activeTab === 'calendar' ? (
-                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
-                                <div className="lg:col-span-3 bg-white shadow-2xl rounded-[48px] overflow-hidden border border-slate-100">
-                                    <div className="grid grid-cols-7 bg-slate-900 text-white py-6 text-center text-[10px] font-black uppercase tracking-[0.2em]">
-                                        <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div className="text-red-400">Sáb</div><div className="text-red-400">Dom</div>
+                    <div className="max-w-7xl mx-auto px-4 md:px-8">
+                        {ui.tab === 'calendar' ? (
+                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                                <div className="lg:col-span-3 bg-white shadow-xl rounded-[40px] overflow-hidden border border-slate-100">
+                                    <div className="grid grid-cols-7 bg-slate-900 text-white py-4 text-center text-[9px] font-black uppercase tracking-widest">
+                                        {['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => <div key={d} className={d === 'Sáb' || d === 'Dom' ? 'text-red-400' : ''}>{d}</div>)}
                                     </div>
                                     <div className="grid grid-cols-7">
                                         {(() => {
-                                            const year = currentDate.getFullYear(); const month = currentDate.getMonth();
-                                            const first = (new Date(year, month, 1).getDay() + 6) % 7;
-                                            const days = new Date(year, month + 1, 0).getDate();
-                                            const grid = [];
-                                            for (let i = 0; i < first; i++) grid.push(<div key={`e-${i}`} className="h-28 md:h-36 border border-slate-100 bg-slate-50/20"></div>);
-                                            for (let d = 1; d <= days; d++) {
-                                                const dStr = toLocalISO(new Date(year, month, d));
-                                                const data = shiftsData[dStr] || {};
-                                                const calc = calculateDaily(dStr, data);
-                                                const isF = (new Date(year, month, d).getDay() === 0 || new Date(year, month, d).getDay() === 6);
-                                                grid.push(
-                                                    <div key={d} onClick={() => { setSelectedDay({ day: d, dateStr: dStr, ...data }); setIsModalOpen(true); }} className={`day-card h-28 md:h-36 border border-slate-200 p-1.5 cursor-pointer transition-all hover:bg-indigo-50 relative flex flex-col overflow-hidden ${isF ? 'bg-red-50/30' : 'bg-white'}`}>
-                                                        <div className="flex justify-between items-start mb-1">
-                                                            <span className={`text-[10px] font-black ${isF ? 'text-red-500' : 'text-slate-400'}`}>{d}</span>
-                                                            <div className="flex items-center gap-1">
-                                                                {(data.shift || data.isReten) && <button onClick={(e) => { e.stopPropagation(); const nd = {...shiftsData}; delete nd[dStr]; setShiftsData(nd); persist(nd, 'shifts'); }} className="clear-btn p-1 text-slate-300 hover:text-red-500"><Icon name="trash-2" size={12} /></button>}
-                                                                {calc.total > 0 && <span className="text-[9px] font-black text-green-700 bg-green-100 px-1.5 py-0.5 rounded">{calc.total.toFixed(0)}€</span>}
+                                            const y = viewDate.getFullYear(), m = viewDate.getMonth();
+                                            const start = (new Date(y, m, 1).getDay() + 6) % 7;
+                                            const total = new Date(y, m + 1, 0).getDate();
+                                            const cells = [];
+                                            for(let i=0; i<start; i++) cells.push(<div key={`e-${i}`} className="h-32 md:h-48 border border-slate-50 bg-slate-50/30"></div>);
+                                            for(let d=1; d<=total; d++) {
+                                                const ds = toISO(new Date(y, m, d));
+                                                const dayData = shifts[ds];
+                                                const dayCalc = calcDay(ds, dayData);
+                                                const isWeekend = (new Date(y, m, d).getDay() === 0 || new Date(y, m, d).getDay() === 6);
+                                                cells.push(
+                                                    <div key={d} onClick={() => { setSelected({ day: d, ds, ...dayData }); setUi({...ui, modal: true}); }} className={`h-48 md:h-60 border border-slate-100 p-3 cursor-pointer transition-all hover:bg-indigo-50 relative group ${isWeekend ? 'bg-red-50/20' : 'bg-white'}`}>
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <span className={`text-[12px] font-black ${isWeekend ? 'text-red-400' : 'text-slate-300'}`}>{d}</span>
+                                                            <div className="flex flex-col items-end gap-1">
+                                                                {dayCalc.total > 0 && <span className="text-[10px] font-black text-green-700 bg-green-50 px-2 py-1 rounded border border-green-100 shadow-sm">{dayCalc.total.toFixed(0)}€</span>}
+                                                                {dayCalc.restHours > 0 && <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 shadow-sm flex items-center gap-1"><Icon name="coffee" size={10}/>{dayCalc.restHours.toFixed(1)}h</span>}
                                                             </div>
                                                         </div>
-                                                        <div className="flex flex-col gap-0.5 flex-1 overflow-y-auto no-scrollbar">
-                                                            {data.isReten && <div className="text-[7px] bg-indigo-600 text-white font-black px-1 rounded text-center">RETÉN</div>}
-                                                            {data.shift && data.shift !== 'D' && <div className={`text-[8px] md:text-[9px] px-1 rounded font-black text-center ${SHIFTS.find(s => s.id === data.shift)?.color || 'bg-slate-100'}`}>{data.shift}</div>}
-                                                            {calc.details.map((v, i) => <div key={i} className="flex justify-between text-[6.5px] md:text-[7.5px] text-slate-500 font-bold"><span className="truncate pr-1">{v.label}</span><span>{v.value.toFixed(0)}</span></div>)}
+                                                        <div className="space-y-1 overflow-hidden">
+                                                            {dayData?.isReten && <div className="text-[8px] bg-indigo-600 text-white font-black px-1.5 py-0.5 rounded text-center mb-1 uppercase tracking-tighter">Retén</div>}
+                                                            {dayData?.shift && dayData.shift !== 'D' && <div className={`text-[9px] font-black text-center px-2 py-0.5 rounded shadow-sm mb-1 ${SHIFTS.find(s => s.id === dayData.shift)?.color || 'bg-slate-100'}`}>{dayData.shift}</div>}
+                                                            <div className="space-y-0.5">
+                                                                {dayCalc.items.map((item, idx) => (
+                                                                    <div key={idx} className={`flex justify-between items-center text-[8px] leading-tight font-semibold border-b border-slate-50 pb-0.5 ${item.type === 'coffee' ? 'text-indigo-500' : 'text-slate-500'}`}>
+                                                                        <span className="truncate pr-1">{item.label}</span>
+                                                                        <span className="text-slate-900 shrink-0">{item.value.toFixed(1)}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         </div>
+                                                        {(dayData?.shift || dayData?.isReten || dayData?.activeConceptsCount) && (
+                                                            <button onClick={(e) => { e.stopPropagation(); const ns = {...shifts}; delete ns[ds]; setShifts(ns); save(ns, 'shifts'); }} className="absolute bottom-2 right-2 p-2 text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icon name="trash-2" size={14} /></button>
+                                                        )}
                                                     </div>
                                                 );
                                             }
-                                            return grid;
+                                            return cells;
                                         })()}
                                     </div>
                                 </div>
-                                <div className="space-y-8">
-                                    <div className="bg-white p-8 rounded-[48px] shadow-2xl border border-slate-100 sticky top-8">
-                                        <h2 className="text-xl font-black mb-10 flex items-center gap-3"><Icon name="euro" className="text-indigo-600" />Balance Mes</h2>
-                                        <div className="space-y-4">
-                                            {Object.entries(monthSummary).map(([k, v]) => k !== 'total' && v > 0 && (
-                                                <div key={k} className="flex justify-between items-center"><span className="text-slate-400 text-[10px] font-black uppercase">{k}</span><span className="font-black text-slate-800 text-sm">{v.toLocaleString('es-ES', { minimumFractionDigits: 2 })}€</span></div>
+                                {/* Sidebar Balance */}
+                                <div className="space-y-6">
+                                    <div className="bg-white p-8 rounded-[40px] shadow-xl border border-slate-100 sticky top-4">
+                                        <h3 className="text-sm font-black mb-6 flex items-center gap-2 uppercase tracking-widest"><Icon name="trending-up" className="text-indigo-600" /> Balance Mes</h3>
+                                        <div className="space-y-3">
+                                            {[
+                                                { l: 'Descanso Generado', v: stats.month.restHours, unit: 'h', c: 'text-indigo-600 font-black' },
+                                                { l: 'TRC', v: stats.month.trc },
+                                                { l: 'TRA', v: stats.month.tra },
+                                                { l: 'Llamadas', v: stats.month.call },
+                                                { l: 'Kilómetros', v: stats.month.km },
+                                                { l: 'H. Extras (Pago)', v: stats.month.he },
+                                                { l: 'Nocturnidad', v: stats.month.night },
+                                                { l: 'Retenes', v: stats.month.reten }
+                                            ].map(item => item.v > 0 && (
+                                                <div key={item.l} className="flex justify-between items-center text-[10px] font-bold">
+                                                    <span className="text-slate-400 uppercase tracking-tighter">{item.l}</span>
+                                                    <span className={item.c || 'text-slate-800'}>{item.v.toLocaleString('es-ES', { minimumFractionDigits: 1 })}{item.unit || '€'}</span>
+                                                </div>
                                             ))}
-                                            <div className="pt-8 mt-6 border-t-4 border-double border-slate-100 flex flex-col items-end">
-                                                <span className="text-[11px] font-black text-slate-400 uppercase mb-2">Total Variable Bruto</span>
-                                                <span className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">{monthSummary.total.toLocaleString('es-ES', { minimumFractionDigits: 2 })}€</span>
+                                            <div className="mt-6 pt-6 border-t-2 border-slate-50 flex flex-col items-end">
+                                                <span className="text-[9px] font-black text-slate-400 uppercase mb-1">Bruto Variable Estimado</span>
+                                                <span className="text-4xl font-black text-slate-900 tracking-tighter">{stats.month.total.toLocaleString('es-ES', { minimumFractionDigits: 2 })}€</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         ) : (
-                            <div className="animate-in grid grid-cols-1 lg:grid-cols-2 gap-10">
-                                <div className="bg-white p-10 rounded-[56px] shadow-2xl border border-slate-100">
-                                    <h2 className="text-2xl font-black mb-12 flex items-center gap-4"><Icon name="pie-chart" className="text-indigo-600" />Distribución Total</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-                                        <div className="aspect-square relative"><PieChart data={[ { name: 'Plus TRC', value: globalStats.trc, color: '#6366f1' }, { name: 'Plus TRA', value: globalStats.tra, color: '#f59e0b' }, { name: 'Llamada', value: globalStats.llamada, color: '#ef4444' }, { name: 'Alim', value: globalStats.alim, color: '#10b981' }, { name: 'Km', value: globalStats.km, color: '#0ea5e9' }, { name: 'Extras', value: globalStats.extras, color: '#8b5cf6' }, { name: 'Noche', value: globalStats.nocturna, color: '#334155' }, { name: 'Retén', value: globalStats.reten, color: '#4f46e5' }, { name: 'Otros', value: globalStats.custom, color: '#94a3b8' } ]} /><div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"><span className="text-[10px] font-black text-slate-400 uppercase">Total</span><span className="text-xl font-black text-slate-900">{globalStats.total.toLocaleString('es-ES', { maximumFractionDigits: 0 })}€</span></div></div>
-                                        <div className="space-y-4">
-                                            {[ { n: 'TRC', v: globalStats.trc, c: '#6366f1' }, { n: 'TRA', v: globalStats.tra, c: '#f59e0b' }, { n: 'Llamada', v: globalStats.llamada, c: '#ef4444' }, { n: 'Alim', v: globalStats.alim, c: '#10b981' }, { n: 'Km', v: globalStats.km, c: '#0ea5e9' }, { n: 'HE', v: globalStats.extras, c: '#8b5cf6' }, { n: 'Noche', v: globalStats.nocturna, c: '#334155' }, { n: 'Retén', v: globalStats.reten, c: '#4f46e5' } ].map((it, i) => it.v > 0 && (
-                                                <div key={i} className="flex items-center gap-4"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: it.c }}></div><div><span className="text-[9px] font-black text-slate-400 uppercase">{it.n}</span><p className="text-xs font-black text-slate-800">{it.v.toFixed(2)}€</p></div></div>
-                                            ))}
+                            /* Stats View */
+                            <div className="animate-in grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div className="bg-white p-10 rounded-[48px] shadow-xl border border-slate-100">
+                                    <h3 className="text-sm font-black mb-10 flex items-center gap-2 uppercase tracking-widest"><Icon name="pie-chart" className="text-indigo-600" /> Distribución Mensual</h3>
+                                    <div className="flex flex-col md:flex-row items-center gap-10">
+                                        <div className="w-48 h-48 relative shrink-0">
+                                            <PieChart data={[
+                                                { label: 'TRC', value: stats.month.trc, color: '#6366f1' },
+                                                { label: 'TRA', value: stats.month.tra, color: '#f59e0b' },
+                                                { label: 'Llamada', value: stats.month.call, color: '#ef4444' },
+                                                { label: 'Food', value: stats.month.food, color: '#10b981' },
+                                                { label: 'KM', value: stats.month.km, color: '#0ea5e9' },
+                                                { label: 'HE', value: stats.month.he, color: '#8b5cf6' },
+                                                { label: 'Night', value: stats.month.night, color: '#334155' },
+                                                { label: 'Retén', value: stats.month.reten, color: '#4f46e5' }
+                                            ]} />
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Total</span>
+                                                <span className="text-lg font-black text-slate-900 tracking-tighter">{Math.round(stats.month.total)}€</span>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-4 w-full">
+                                            <div className="bg-indigo-50 p-4 rounded-3xl border border-indigo-100">
+                                                <p className="text-[8px] font-black text-indigo-400 uppercase">Horas Descanso Mes</p>
+                                                <p className="text-3xl font-black text-indigo-700">{stats.month.restHours.toFixed(1)}h</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {[
+                                                    { l: 'HE Pago', v: stats.month.he, c: '#8b5cf6' },
+                                                    { l: 'Llamadas', v: stats.month.call, c: '#ef4444' }
+                                                ].map(item => (
+                                                    <div key={item.l} className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                                        <p className="text-[8px] font-black text-slate-400 uppercase">{item.l}</p>
+                                                        <p className="text-xs font-black text-slate-800">{item.v.toFixed(0)}€</p>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="bg-slate-900 p-12 rounded-[56px] shadow-2xl text-white">
-                                    <h2 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Acumulado Histórico</h2>
-                                    <p className="text-6xl md:text-8xl font-black tracking-tighter mb-4 leading-none">{globalStats.total.toLocaleString('es-ES', { maximumFractionDigits: 0 })}<span className="text-indigo-500 text-3xl">€</span></p>
-                                    <p className="text-slate-400 font-bold text-sm uppercase max-w-xs">Suma total registrada.</p>
+                                <div className="bg-slate-900 p-10 rounded-[48px] shadow-2xl text-white flex flex-col justify-center overflow-hidden relative">
+                                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Acumulado Histórico</h3>
+                                            <p className="text-7xl md:text-8xl font-black tracking-tighter mb-4 leading-none">
+                                                {Math.floor(stats.global.total).toLocaleString('es-ES')}
+                                                <span className="text-indigo-500 text-4xl">€</span>
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <h3 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Descanso Pendiente</h3>
+                                            <p className="text-5xl font-black tracking-tighter text-indigo-400">{stats.global.restHours.toFixed(1)}<span className="text-sm ml-1">h</span></p>
+                                        </div>
+                                    </div>
+                                    <p className="text-slate-400 font-bold text-xs uppercase tracking-widest opacity-60 mt-8">Suma total de variables registrados</p>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {isSettingsOpen && (
-                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
-                            <div className="bg-white w-full max-w-xl rounded-[60px] p-10 md:p-14 border border-white/20 overflow-y-auto max-h-[90vh]">
-                                <div className="flex justify-between items-center mb-10"><h3 className="text-3xl font-black">Ajustes</h3><button onClick={() => signOut(auth)} className="flex items-center gap-2 p-3 bg-red-50 text-red-600 font-black text-[10px] uppercase rounded-2xl">Salir</button></div>
+                    {/* Settings Modal */}
+                    {ui.settings && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in">
+                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 border border-white/20">
+                                <h3 className="text-2xl font-black mb-8 flex items-center gap-3">Ajustes <Icon name="settings" size={20} /></h3>
                                 <div className="space-y-8">
-                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Grupo</label><div className="grid grid-cols-4 gap-2">{Object.keys(SALARY_DATA).map(g => <button key={g} onClick={() => { const p = {...userProfile, group: g}; setUserProfile(p); persist(p, 'profile'); }} className={`py-4 rounded-3xl font-black text-sm border-2 ${userProfile.group === g ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{g}</button>)}</div></section>
-                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Nivel</label><div className="grid grid-cols-6 gap-2">{[...Array(12)].map((_, i) => { const lvl = String(i + 1); return <button key={lvl} onClick={() => { const p = {...userProfile, level: lvl}; setUserProfile(p); persist(p, 'profile'); }} className={`py-3 rounded-2xl font-black text-xs border-2 ${userProfile.level === lvl ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{lvl}</button>; })}</div></section>
-                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Kilometraje Centro</label><input type="number" className="w-full bg-slate-50 p-6 rounded-[32px] border-2 border-indigo-200 text-4xl font-black text-indigo-600" value={userProfile.kmCount} onChange={(e) => { const p = {...userProfile, kmCount: parseFloat(e.target.value) || 0}; setUserProfile(p); persist(p, 'profile'); }} /></section>
+                                    <section>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-3 tracking-widest">Grupo Profesional</label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {Object.keys(SALARY_DATA).map(g => (
+                                                <button key={g} onClick={() => { const np = {...profile, group: g}; setProfile(np); save(np, 'profile'); }} className={`py-3 rounded-xl font-black text-xs border-2 transition-all ${profile.group === g ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{g}</button>
+                                            ))}
+                                        </div>
+                                    </section>
+                                    <section>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-3 tracking-widest">Nivel Salarial</label>
+                                        <div className="grid grid-cols-6 gap-2">
+                                            {[...Array(12)].map((_, i) => {
+                                                const lvl = String(i + 1);
+                                                return <button key={lvl} onClick={() => { const np = {...profile, level: lvl}; setProfile(np); save(np, 'profile'); }} className={`py-2.5 rounded-xl font-black text-[10px] border-2 transition-all ${profile.level === lvl ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{lvl}</button>;
+                                            })}
+                                        </div>
+                                    </section>
+                                    <section>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-3 tracking-widest">Km Centro (Base)</label>
+                                        <div className="relative">
+                                            <input type="number" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-2xl font-black text-slate-800 outline-none focus:border-indigo-200 transition-colors" value={profile.kmCount} onChange={e => { const np = {...profile, kmCount: parseFloat(e.target.value) || 0}; setProfile(np); save(np, 'profile'); }} />
+                                            <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-300 uppercase text-xs">Km</span>
+                                        </div>
+                                    </section>
                                 </div>
-                                <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-10 py-6 bg-slate-900 text-white font-black rounded-[32px]">Cerrar</button>
+                                <button onClick={() => setUi({...ui, settings: false})} className="w-full mt-10 py-5 bg-slate-900 text-white font-black rounded-2xl uppercase text-xs tracking-widest shadow-lg">Guardar Cambios</button>
                             </div>
                         </div>
                     )}
 
-                    {isModalOpen && selectedDay && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
-                            <div className="bg-white w-full max-w-3xl rounded-[64px] shadow-2xl overflow-hidden animate-in">
-                                <div className="bg-slate-900 p-10 text-white flex justify-between items-center"><div><p className="text-indigo-400 text-[10px] font-black uppercase mb-2">Configuración</p><h3 className="text-3xl font-black">{new Date(selectedDay.dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</h3></div><button onClick={() => setIsModalOpen(false)} className="p-4 bg-white/10 rounded-[32px]"><Icon name="x" size={32} /></button></div>
-                                <div className="p-8 md:p-12 max-h-[65vh] overflow-y-auto space-y-8 no-scrollbar">
-                                    <section><div onClick={() => { const r = !selectedDay.isReten; let c = selectedDay.activeConcepts || []; if (r) c = c.filter(i => i !== 'comp_llamada'); const nd = {...selectedDay, isReten: r, activeConcepts: c}; setSelectedDay(nd); const ns = {...shiftsData, [nd.dateStr]: nd}; setShiftsData(ns); persist(ns, 'shifts'); }} className={`p-6 rounded-[32px] border-4 flex items-center justify-between cursor-pointer ${selectedDay.isReten ? 'border-indigo-600 bg-indigo-50' : 'border-slate-100 bg-slate-50 opacity-60'}`}><div className="flex items-center gap-4"><div className={`p-4 rounded-2xl ${selectedDay.isReten ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}><Icon name="shield-check" size={32} /></div><h4 className="text-lg font-black uppercase">Estado: Retén</h4></div><div className={`w-8 h-8 rounded-full border-4 ${selectedDay.isReten ? 'bg-indigo-600 border-indigo-200' : 'bg-white border-slate-200'}`}></div></div></section>
-                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Tipo de Turno</label><div className="grid grid-cols-5 gap-3">{SHIFTS.map(s => <button key={s.id} onClick={() => { 
-                                        const d = new Date(selectedDay.dateStr); const f = (d.getDay() === 0 || d.getDay() === 6);
-                                        const upd = { ...selectedDay, shift: s.id, activeConcepts: (['R7', 'R9'].includes(s.id) ? ['trc', 'plus_llamada', 'comp_llamada', 'comida', 'comp_km'] : ['S1', 'S3', 'S5'].includes(s.id) ? ['trc'] : ['R1', 'R3'].includes(s.id) ? ['tra'] : []), extras: (s.id === 'R7' || s.id === 'R9' ? (f ? 12 : 3.5) : 0), horasNocturnas: (['R9', 'S5'].includes(s.id) ? 8 : ['R3', 'S3'].includes(s.id) ? 1 : 0) };
-                                        setSelectedDay(upd); const ns = {...shiftsData, [upd.dateStr]: upd}; setShiftsData(ns); persist(ns, 'shifts');
-                                    }} className={`py-4 rounded-3xl border-2 font-black text-xs ${selectedDay.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-100 text-slate-400'}`}>{s.id}</button>)}</div></section>
-                                    <section><label className="text-[11px] font-black uppercase text-slate-400 block mb-4">Complementos</label><div className="grid grid-cols-2 md:grid-cols-3 gap-3">{STANDARD_CONCEPTS.map(c => {
-                                        const active = (selectedDay.activeConcepts || []).includes(c.id); const forbidden = selectedDay.isReten && c.id === 'comp_llamada';
-                                        return <button key={c.id} disabled={forbidden} onClick={() => {
-                                            let curr = selectedDay.activeConcepts || []; let next = curr.includes(c.id) ? curr.filter(i => i !== c.id) : [...curr, c.id];
-                                            if (c.id === 'plus_llamada') { if (next.includes('plus_llamada')) { if (!next.includes('comp_km')) next.push('comp_km'); } else { next = next.filter(i => i !== 'comp_km'); }}
-                                            const upd = {...selectedDay, activeConcepts: next}; setSelectedDay(upd); const ns = {...shiftsData, [upd.dateStr]: upd}; setShiftsData(ns); persist(ns, 'shifts');
-                                        }} className={`flex items-center gap-3 p-4 rounded-[24px] border-2 text-[10px] font-black uppercase ${active ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-100 bg-slate-50 text-slate-400'} ${forbidden ? 'opacity-20 grayscale cursor-not-allowed' : ''}`}><Icon name={active ? "check-square" : "square"} size={18} />{c.label}</button>;
-                                    })}</div></section>
-                                    <div className="grid grid-cols-2 gap-8">
-                                        <section><label className="text-[11px] font-black uppercase mb-3 block text-slate-400">Extras (h)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-6 rounded-[32px] border-2 border-slate-100 text-4xl font-black" value={selectedDay.extras || 0} onChange={(e) => { const upd = {...selectedDay, extras: parseFloat(e.target.value) || 0}; setSelectedDay(upd); const ns = {...shiftsData, [upd.dateStr]: upd}; setShiftsData(ns); persist(ns, 'shifts'); }} /></section>
-                                        <section><label className="text-[11px] font-black uppercase mb-3 block text-slate-400">Noche (h)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-6 rounded-[32px] border-2 border-slate-100 text-4xl font-black" value={selectedDay.horasNocturnas || 0} onChange={(e) => { const upd = {...selectedDay, horasNocturnas: parseFloat(e.target.value) || 0}; setSelectedDay(upd); const ns = {...shiftsData, [upd.dateStr]: upd}; setShiftsData(ns); persist(ns, 'shifts'); }} /></section>
-                                    </div>
+                    {/* Day Editor Modal */}
+                    {ui.modal && selected && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in">
+                            <div className="bg-white w-full max-w-2xl rounded-[48px] shadow-2xl overflow-hidden border border-white/10">
+                                <div className="bg-slate-900 p-8 text-white flex justify-between items-center">
+                                    <div><p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Editor de Jornada</p><h3 className="text-3xl font-black">{new Date(selected.ds).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</h3></div>
+                                    <button onClick={() => setUi({...ui, modal: false})} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-colors"><Icon name="x" size={24} /></button>
                                 </div>
-                                <div className="p-8 md:p-12 bg-slate-50 border-t-2 border-slate-100 flex justify-end gap-4"><button onClick={() => { const nd = {...shiftsData}; delete nd[selectedDay.dateStr]; setShiftsData(nd); persist(nd, 'shifts'); setIsModalOpen(false); }} className="px-8 py-6 bg-red-50 text-red-600 font-black rounded-[32px] uppercase text-sm">Borrar</button><button onClick={() => setIsModalOpen(false)} className="px-12 md:px-20 py-6 bg-slate-900 text-white font-black rounded-[32px] uppercase text-sm">Guardar</button></div>
+                                <div className="p-8 max-h-[70vh] overflow-y-auto no-scrollbar space-y-8">
+                                    {/* Retén Switch */}
+                                    <section>
+                                        <div onClick={() => {
+                                            const nr = !selected.isReten;
+                                            const upd = {...selected, isReten: nr};
+                                            setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts');
+                                        }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer transition-all ${selected.isReten ? 'border-indigo-600 bg-indigo-50 shadow-lg' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
+                                            <div className="flex items-center gap-4"><div className={`p-3 rounded-xl ${selected.isReten ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}><Icon name="shield-check" size={24} /></div><h4 className="font-black uppercase text-sm tracking-tight">Estado de Retén</h4></div>
+                                            <div className={`w-8 h-8 rounded-full border-4 transition-all ${selected.isReten ? 'bg-indigo-600 border-indigo-200 scale-110' : 'bg-white border-slate-200'}`}></div>
+                                        </div>
+                                    </section>
+
+                                    {/* Shift Grid */}
+                                    <section>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Tipo de Turno</label>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            {SHIFTS.map(s => (
+                                                <button key={s.id} onClick={() => {
+                                                    const d = new Date(selected.ds), f = d.getDay() === 0 || d.getDay() === 6;
+                                                    const upd = { ...selected, shift: s.id, 
+                                                        activeConceptsCount: (['R7', 'R9'].includes(s.id) ? {trc: 1, plus_llamada: 1, comp_llamada: 1, comida: 1, comp_km: 1} : ['S1', 'S3', 'S5'].includes(s.id) ? {trc: 1} : ['R1', 'R3'].includes(s.id) ? {tra: 1} : {}),
+                                                        extras: (s.id === 'R7' || s.id === 'R9' ? (f ? 12 : 3.5) : 0),
+                                                        horasNocturnas: (['R9', 'S5'].includes(s.id) ? 8 : ['R3', 'S3'].includes(s.id) ? 1 : 0)
+                                                    };
+                                                    setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts');
+                                                }} className={`py-3 rounded-xl border-2 font-black text-[10px] transition-all ${selected.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800 shadow-md scale-105' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>{s.id}</button>
+                                            ))}
+                                        </div>
+                                    </section>
+
+                                    {/* Quantifiable Concepts */}
+                                    <section>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Complementos (Cantidades)</label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {[
+                                                { id: 'trc', l: 'Plus TRC', ic: 'activity' }, 
+                                                { id: 'tra', l: 'Plus TRA', ic: 'trending-up' }, 
+                                                { id: 'plus_llamada', l: 'Plus Llamada', ic: 'phone-incoming' }, 
+                                                { id: 'comp_llamada', l: 'Comp. Llamada', ic: 'phone-forwarded' }, 
+                                                { id: 'comida', l: 'Ayuda Comida', ic: 'utensils' }, 
+                                                { id: 'comp_km', l: 'Kilometraje', ic: 'map' }
+                                            ].map(c => {
+                                                const count = selected.activeConceptsCount?.[c.id] || 0;
+                                                const isDisabled = selected.isReten && c.id === 'comp_llamada';
+                                                
+                                                return (
+                                                    <div key={c.id} className={`flex flex-col bg-slate-50 p-4 rounded-3xl border-2 transition-all ${count > 0 ? 'border-indigo-200 bg-indigo-50/30' : 'border-slate-100'} ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <Icon name={c.ic} size={18} className={count > 0 ? 'text-indigo-600' : 'text-slate-400'} />
+                                                                <span className={`text-[10px] font-black uppercase ${count > 0 ? 'text-indigo-900' : 'text-slate-500'}`}>{c.l}</span>
+                                                            </div>
+                                                            <div className="flex items-center bg-white rounded-2xl shadow-sm border border-slate-100 p-1">
+                                                                <button disabled={isDisabled} onClick={() => updateSelectedConcept(c.id, -1)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 disabled:opacity-0"><Icon name="minus" size={14} /></button>
+                                                                <span className="w-8 text-center font-black text-xs text-indigo-600">{count}</span>
+                                                                <button disabled={isDisabled} onClick={() => updateSelectedConcept(c.id, 1)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 disabled:opacity-0"><Icon name="plus" size={14} /></button>
+                                                            </div>
+                                                        </div>
+                                                        {c.id === 'comp_km' && count > 0 && (
+                                                            <div className="mt-4 pt-4 border-t border-indigo-100 animate-in">
+                                                                <label className="text-[8px] font-black text-indigo-400 uppercase mb-2 block tracking-widest">Añadir Km adicionales</label>
+                                                                <div className="flex items-center gap-3">
+                                                                    <input type="number" placeholder="0" className="w-full bg-white p-3 rounded-xl border border-indigo-100 font-black text-indigo-600 text-center text-sm outline-none" value={selected.extraKm || ''} onChange={e => {
+                                                                        const v = parseFloat(e.target.value) || 0;
+                                                                        const upd = {...selected, extraKm: v};
+                                                                        setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts');
+                                                                    }} />
+                                                                    <span className="text-[10px] font-black text-indigo-300">KM</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </section>
+
+                                    {/* Hours & Compensation Section */}
+                                    <section className="space-y-6">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Extras (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200" value={selected.extras || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, extras: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div>
+                                            <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Noche (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200" value={selected.horasNocturnas || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, horasNocturnas: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div>
+                                        </div>
+
+                                        {(parseFloat(selected.extras) > 0) && (
+                                            <div className="bg-indigo-50 p-6 rounded-[32px] border-2 border-indigo-100 animate-in">
+                                                <label className="text-[10px] font-black uppercase text-indigo-600 block mb-4 tracking-widest">¿Cómo compensar las extras?</label>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                                    <button onClick={() => { const upd = {...selected, extraCompMode: 'money'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'money' || !selected.extraCompMode ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Cobro 100%</button>
+                                                    
+                                                    <button onClick={() => { const upd = {...selected, extraCompMode: 'rest_total'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'rest_total' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Descanso Total</button>
+                                                    
+                                                    <button disabled={new Date(selected.ds).getDay() === 0 || new Date(selected.ds).getDay() === 6 || parseFloat(selected.horasNocturnas) > 0} onClick={() => { const upd = {...selected, extraCompMode: 'mixed'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'mixed' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'} disabled:opacity-30 disabled:cursor-not-allowed`}>Mixto (Desc + 0.75)</button>
+                                                </div>
+                                                <p className="mt-3 text-[8px] font-bold text-indigo-400 uppercase italic">
+                                                    {(new Date(selected.ds).getDay() === 0 || new Date(selected.ds).getDay() === 6 || parseFloat(selected.horasNocturnas) > 0) 
+                                                        ? "* Día Festivo/Nocturno: Factor 2.0x" 
+                                                        : "* Día Laboral: Factor 1.75x o Mixto"}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </section>
+                                </div>
+                                <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                                    <button onClick={() => { const ns = {...shifts}; delete ns[selected.ds]; setShifts(ns); save(ns, 'shifts'); setUi({...ui, modal: false}); }} className="px-6 py-4 bg-red-50 text-red-600 font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-red-100 transition-colors">Borrar Día</button>
+                                    <button onClick={() => setUi({...ui, modal: false})} className="px-10 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-lg hover:bg-slate-800 transition-all active:scale-95">Listo</button>
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
             );
         };
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
