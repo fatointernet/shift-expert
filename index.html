@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANAV ShiftExpert v6.6 - Restricciones R7/R9</title>
+    <title>ANAV ShiftExpert v6.8 - Corrección Extras R7/R9</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -169,7 +169,6 @@
                 Object.entries(concepts).forEach(([id, count]) => {
                     if (count <= 0) return;
 
-                    // RESTRICCIÓN R7/R9: Km y Llamadas solo en festivos
                     const isR7R9 = data.shift === 'R7' || data.shift === 'R9';
                     const isRestricted = ['comp_km', 'plus_llamada', 'comp_llamada'].includes(id);
                     if (isR7R9 && isRestricted && !isF) return;
@@ -493,7 +492,32 @@
                                             </div>
                                         </section>
                                         <section>
-                                            <div onClick={() => { const nf = !selected.isFestive; const upd = {...selected, isFestive: nf}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer transition-all ${selected.isFestive ? 'border-red-600 bg-red-50 shadow-lg' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
+                                            <div onClick={() => { 
+                                                const nf = !selected.isFestive; 
+                                                let upd = {...selected, isFestive: nf};
+                                                
+                                                // --- AUTOMATIZACIÓN R7/R9 EN FESTIVO ---
+                                                if (selected.shift === 'R7' || selected.shift === 'R9') {
+                                                    // Si es festivo 12h, si es laboral 3.5h
+                                                    upd.extras = nf ? 12 : 3.5;
+                                                    
+                                                    if (nf) {
+                                                        upd.activeConceptsCount = {
+                                                            ...(upd.activeConceptsCount || {}),
+                                                            comp_km: 1,
+                                                            plus_llamada: 1,
+                                                            comp_llamada: 1,
+                                                            trc: 1,
+                                                            comida: 1
+                                                        };
+                                                    }
+                                                }
+
+                                                setSelected(upd); 
+                                                const ns = {...shifts, [upd.ds]: upd}; 
+                                                setShifts(ns); 
+                                                save(ns, 'shifts'); 
+                                            }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer transition-all ${selected.isFestive ? 'border-red-600 bg-red-50 shadow-lg' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
                                                 <div className="flex items-center gap-4"><div className={`p-3 rounded-xl ${selected.isFestive ? 'bg-red-600 text-white' : 'bg-slate-200'}`}><Icon name="party-popper" size={24} /></div><h4 className="font-black uppercase text-xs tracking-tight">Festivo</h4></div>
                                                 <div className={`w-8 h-8 rounded-full border-4 transition-all ${selected.isFestive ? 'bg-red-600 border-red-200 scale-110' : 'bg-white border-slate-200'}`}></div>
                                             </div>
@@ -506,6 +530,7 @@
                                                 ? (f ? {trc: 1, plus_llamada: 1, comp_llamada: 1, comida: 1, comp_km: 1, otros: 0} : {trc: 1, comida: 1, otros: 0}) 
                                                 : ['S1', 'S3', 'S5'].includes(s.id) ? {trc: 1, otros: 0} 
                                                 : ['R1', 'R3'].includes(s.id) ? {tra: 1, otros: 0} : {otros: 0}), 
+                                            // CORRECCIÓN: 3.5h si no es festivo para R7/R9
                                             extras: (s.id === 'R7' || s.id === 'R9' ? (f ? 12 : 3.5) : 0), 
                                             horasNocturnas: (['R9', 'S5'].includes(s.id) ? 8 : ['R3', 'S3'].includes(s.id) ? 1 : 0) 
                                         }; 
