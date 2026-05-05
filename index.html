@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANAV ShiftExpert v6.0 - Sistema de Compensación</title>
+    <title>ANAV ShiftExpert v6.4 - Compensación Domingos</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -57,7 +57,16 @@
             "G VII": { "1-9": { extra: 38.50, night: 3.15, call: 62.15, r_l: 51.20, r_f: 85.00 }, "10-12": { extra: 38.50, night: 3.15, call: 62.15, r_l: 51.20, r_f: 85.00 } }
         };
 
-        const GLOBAL_CONST = { TRC: 55.01, TRA: 20.90, CALL_L: 54.47, CALL_F: 98.35, FOOD: 40.69, KM_PRICE: 0.55 };
+        const GLOBAL_CONST = { 
+            TRC: 55.01, 
+            TRA: 20.90, 
+            CALL_L: 54.47, 
+            CALL_F: 98.35, 
+            FOOD: 40.69, 
+            KM_PRICE: 0.55,
+            P1_BASE: 32.90,
+            P1_FRI: 46.74
+        };
 
         const SHIFTS = [
             { id: 'D', color: 'bg-gray-100 text-gray-400' },
@@ -139,12 +148,20 @@
             const calcDay = useCallback((dateStr, data) => {
                 if (!data) return { total: 0, restHours: 0, items: [] };
                 const d = new Date(dateStr);
-                const isF = d.getDay() === 0 || d.getDay() === 6;
+                const isSunday = d.getDay() === 0;
+                const isF = isSunday || d.getDay() === 6;
+                const isFriday = d.getDay() === 5;
                 const res = { total: 0, restHours: 0, items: [] };
                 const add = (label, val, type) => {
                     const v = parseFloat(val);
                     if (v > 0) { res.total += v; res.items.push({ label, value: v, type }); }
                 };
+
+                // --- SUNDAY 8H REST RULE ---
+                if (isSunday && data.shift && data.shift !== 'D') {
+                    res.restHours += 8;
+                    res.items.push({ label: "Descanso Domingo", value: 8, type: 'coffee' });
+                }
 
                 if (data.isReten) add(`Retén ${isF ? 'F' : 'L'}`, isF ? rates.r_f : rates.r_l, 'shield');
                 
@@ -166,22 +183,29 @@
                     }
                 });
 
-                // --- OVERTIME COMPENSATION LOGIC ---
+                if (data.shift === 'P1') {
+                    const p1Val = isFriday ? GLOBAL_CONST.P1_FRI : GLOBAL_CONST.P1_BASE;
+                    add(`Plus P1 ${isFriday ? '(Viernes)' : ''}`, p1Val, 'p1_bonus');
+                }
+
+                if (concepts.otros > 0) {
+                    (data.manualEntries || []).forEach((entry) => {
+                        if (entry.label && entry.value) add(entry.label, entry.value, 'custom');
+                    });
+                }
+
                 if (data.shift && data.shift !== 'D') {
                     const h = parseFloat(data.extras) || 0;
                     if (h > 0) {
                         const isNightOrFestive = isF || (parseFloat(data.horasNocturnas) > 0);
-                        const compMode = data.extraCompMode || 'money'; // money, rest_total, mixed
+                        const compMode = data.extraCompMode || 'money';
 
                         if (isNightOrFestive) {
                             if (compMode === 'rest_total') {
                                 res.restHours += h * 2;
                                 res.items.push({ label: `HE Descanso (2x)`, value: h * 2, type: 'coffee' });
-                            } else {
-                                add(`HE ${h}h (2.0)`, h * rates.extra, 'clock');
-                            }
+                            } else add(`HE ${h}h (2.0)`, h * rates.extra, 'clock');
                         } else {
-                            // Laboral Days
                             if (compMode === 'rest_total') {
                                 res.restHours += h * 1.75;
                                 res.items.push({ label: `HE Descanso (1.75x)`, value: h * 1.75, type: 'coffee' });
@@ -189,12 +213,9 @@
                                 res.restHours += h * 1;
                                 add(`HE Parte Pago (0.75x)`, h * rates.extra * 0.75, 'clock');
                                 res.items.push({ label: `HE Descanso (1x)`, value: h * 1, type: 'coffee' });
-                            } else {
-                                add(`HE ${h}h (Laboral)`, h * rates.extra, 'clock');
-                            }
+                            } else add(`HE ${h}h (Laboral)`, h * rates.extra, 'clock');
                         }
                     }
-                    
                     const n = parseFloat(data.horasNocturnas) || 0;
                     if (n > 0) add(`Nocturnidad ${n}h`, n * rates.night, 'moon');
                 }
@@ -203,7 +224,7 @@
 
             const stats = useMemo(() => {
                 const s = { 
-                    month: { total: 0, trc: 0, tra: 0, call: 0, food: 0, km: 0, he: 0, night: 0, reten: 0, restHours: 0 }, 
+                    month: { total: 0, trc: 0, tra: 0, call: 0, food: 0, km: 0, he: 0, night: 0, reten: 0, restHours: 0, custom: 0, p1: 0 }, 
                     global: { total: 0, restHours: 0 } 
                 };
                 Object.entries(shifts).forEach(([ds, data]) => {
@@ -223,6 +244,8 @@
                             else if (i.type === 'clock') s.month.he += i.value;
                             else if (i.type === 'moon') s.month.night += i.value;
                             else if (i.type === 'shield') s.month.reten += i.value;
+                            else if (i.type === 'custom') s.month.custom += i.value;
+                            else if (i.type === 'p1_bonus') s.month.p1 += i.value;
                         });
                     }
                 });
@@ -235,17 +258,19 @@
                 try {
                     if (authFields.reset) { await sendPasswordResetEmail(auth, authFields.email); setAuthFields(p => ({ ...p, resetDone: true })); }
                     else if (authFields.mode === 'register') { await createUserWithEmailAndPassword(auth, authFields.email, authFields.pass); }
-                    else { await signInWithEmailAndPassword(auth, authFields.email, authFields.pass); }
+                    else await signInWithEmailAndPassword(auth, authFields.email, authFields.pass);
                 } catch (err) { setUi(p => ({ ...p, error: 'Credenciales inválidas' })); }
             };
 
             const updateSelectedConcept = (id, delta) => {
                 const currentCount = selected.activeConceptsCount?.[id] || 0;
                 const nextCount = Math.max(0, currentCount + delta);
-                const upd = { 
-                    ...selected, 
-                    activeConceptsCount: { ...(selected.activeConceptsCount || {}), [id]: nextCount } 
-                };
+                let manualEntries = [...(selected.manualEntries || [])];
+                if (id === 'otros') {
+                    if (delta > 0) manualEntries.push({ label: '', value: 0 });
+                    else manualEntries.pop();
+                }
+                const upd = { ...selected, activeConceptsCount: { ...(selected.activeConceptsCount || {}), [id]: nextCount }, manualEntries };
                 setSelected(upd);
                 const ns = { ...shifts, [upd.ds]: upd };
                 setShifts(ns);
@@ -256,7 +281,7 @@
 
             if (!user) return (
                 <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 antialiased">
-                    <div className="bg-slate-900 w-full max-w-sm rounded-[40px] shadow-2xl p-10 border border-slate-800 animate-in">
+                    <div className="bg-slate-900 w-full max-sm rounded-[40px] shadow-2xl p-10 border border-slate-800 animate-in">
                         <div className="flex flex-col items-center mb-10"><Icon name="calendar" size={40} className="text-indigo-500 mb-4" /><h1 className="text-2xl font-black text-white">ShiftExpert</h1></div>
                         <form onSubmit={handleAuth} className="space-y-4">
                             <input type="email" required className="w-full bg-slate-800 p-4 rounded-2xl outline-none text-white text-sm border border-slate-700" placeholder="Email" value={authFields.email} onChange={e => setAuthFields({...authFields, email: e.target.value})} />
@@ -275,16 +300,21 @@
 
             return (
                 <div className="min-h-screen bg-slate-50 pb-20 md:pb-10">
-                    {/* Header */}
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                             <div className="flex items-center gap-4">
                                 <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-lg"><Icon name="calendar" size={24} /></div>
                                 <div>
                                     <h2 className="text-xl font-black text-slate-900 tracking-tight">ShiftExpert</h2>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setUi({...ui, settings: true})} className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 hover:bg-indigo-100 transition-colors">Ajustes</button>
-                                        <button onClick={() => signOut(auth)} className="text-[9px] font-black uppercase text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-100 hover:bg-red-100 transition-colors">Salir</button>
+                                    <div className="flex flex-wrap items-center gap-3 mt-1">
+                                        <span className="text-[11px] font-black uppercase text-slate-400 flex items-center gap-1.5 border-r border-slate-200 pr-3">
+                                            <Icon name="user" size={12} className="text-indigo-500"/>
+                                            Hola, {user.email?.split('@')[0]}
+                                        </span>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setUi({...ui, settings: true})} className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 hover:bg-indigo-100 transition-colors">Ajustes</button>
+                                            <button onClick={() => signOut(auth)} className="text-[9px] font-black uppercase text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-100 hover:bg-red-100 transition-colors">Salir</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -293,7 +323,6 @@
                                 <button onClick={() => setUi({...ui, tab: 'stats'})} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${ui.tab === 'stats' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}>Stats</button>
                             </div>
                         </div>
-
                         {ui.tab === 'calendar' && (
                             <div className="flex justify-center">
                                 <div className="flex items-center bg-white shadow-xl border border-slate-100 rounded-full p-1">
@@ -304,7 +333,6 @@
                             </div>
                         )}
                     </div>
-
                     <div className="max-w-7xl mx-auto px-4 md:px-8">
                         {ui.tab === 'calendar' ? (
                             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -355,20 +383,16 @@
                                         })()}
                                     </div>
                                 </div>
-                                {/* Sidebar Balance */}
                                 <div className="space-y-6">
                                     <div className="bg-white p-8 rounded-[40px] shadow-xl border border-slate-100 sticky top-4">
                                         <h3 className="text-sm font-black mb-6 flex items-center gap-2 uppercase tracking-widest"><Icon name="trending-up" className="text-indigo-600" /> Balance Mes</h3>
                                         <div className="space-y-3">
                                             {[
                                                 { l: 'Descanso Generado', v: stats.month.restHours, unit: 'h', c: 'text-indigo-600 font-black' },
-                                                { l: 'TRC', v: stats.month.trc },
-                                                { l: 'TRA', v: stats.month.tra },
-                                                { l: 'Llamadas', v: stats.month.call },
-                                                { l: 'Kilómetros', v: stats.month.km },
-                                                { l: 'H. Extras (Pago)', v: stats.month.he },
-                                                { l: 'Nocturnidad', v: stats.month.night },
-                                                { l: 'Retenes', v: stats.month.reten }
+                                                { l: 'Plus P1', v: stats.month.p1, c: 'text-slate-800 font-black' },
+                                                { l: 'TRC', v: stats.month.trc }, { l: 'TRA', v: stats.month.tra }, { l: 'Llamadas', v: stats.month.call },
+                                                { l: 'Kilómetros', v: stats.month.km }, { l: 'H. Extras (Pago)', v: stats.month.he },
+                                                { l: 'Nocturnidad', v: stats.month.night }, { l: 'Retenes', v: stats.month.reten }, { l: 'Otros Conceptos', v: stats.month.custom }
                                             ].map(item => item.v > 0 && (
                                                 <div key={item.l} className="flex justify-between items-center text-[10px] font-bold">
                                                     <span className="text-slate-400 uppercase tracking-tighter">{item.l}</span>
@@ -384,21 +408,17 @@
                                 </div>
                             </div>
                         ) : (
-                            /* Stats View */
                             <div className="animate-in grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 <div className="bg-white p-10 rounded-[48px] shadow-xl border border-slate-100">
                                     <h3 className="text-sm font-black mb-10 flex items-center gap-2 uppercase tracking-widest"><Icon name="pie-chart" className="text-indigo-600" /> Distribución Mensual</h3>
                                     <div className="flex flex-col md:flex-row items-center gap-10">
                                         <div className="w-48 h-48 relative shrink-0">
                                             <PieChart data={[
-                                                { label: 'TRC', value: stats.month.trc, color: '#6366f1' },
-                                                { label: 'TRA', value: stats.month.tra, color: '#f59e0b' },
-                                                { label: 'Llamada', value: stats.month.call, color: '#ef4444' },
-                                                { label: 'Food', value: stats.month.food, color: '#10b981' },
-                                                { label: 'KM', value: stats.month.km, color: '#0ea5e9' },
-                                                { label: 'HE', value: stats.month.he, color: '#8b5cf6' },
-                                                { label: 'Night', value: stats.month.night, color: '#334155' },
-                                                { label: 'Retén', value: stats.month.reten, color: '#4f46e5' }
+                                                { label: 'TRC', value: stats.month.trc, color: '#6366f1' }, { label: 'TRA', value: stats.month.tra, color: '#f59e0b' },
+                                                { label: 'Llamada', value: stats.month.call, color: '#ef4444' }, { label: 'Food', value: stats.month.food, color: '#10b981' },
+                                                { label: 'KM', value: stats.month.km, color: '#0ea5e9' }, { label: 'HE', value: stats.month.he, color: '#8b5cf6' },
+                                                { label: 'Night', value: stats.month.night, color: '#334155' }, { label: 'Retén', value: stats.month.reten, color: '#4f46e5' },
+                                                { label: 'P1', value: stats.month.p1, color: '#94a3b8' }, { label: 'Otros', value: stats.month.custom, color: '#cbd5e1' }
                                             ]} />
                                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                                 <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Total</span>
@@ -411,10 +431,7 @@
                                                 <p className="text-3xl font-black text-indigo-700">{stats.month.restHours.toFixed(1)}h</p>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
-                                                {[
-                                                    { l: 'HE Pago', v: stats.month.he, c: '#8b5cf6' },
-                                                    { l: 'Llamadas', v: stats.month.call, c: '#ef4444' }
-                                                ].map(item => (
+                                                {[{ l: 'Plus P1', v: stats.month.p1, c: '#94a3b8' }, { l: 'Llamadas', v: stats.month.call, c: '#ef4444' }].map(item => (
                                                     <div key={item.l} className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
                                                         <p className="text-[8px] font-black text-slate-400 uppercase">{item.l}</p>
                                                         <p className="text-xs font-black text-slate-800">{item.v.toFixed(0)}€</p>
@@ -427,17 +444,8 @@
                                 <div className="bg-slate-900 p-10 rounded-[48px] shadow-2xl text-white flex flex-col justify-center overflow-hidden relative">
                                     <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
                                     <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Acumulado Histórico</h3>
-                                            <p className="text-7xl md:text-8xl font-black tracking-tighter mb-4 leading-none">
-                                                {Math.floor(stats.global.total).toLocaleString('es-ES')}
-                                                <span className="text-indigo-500 text-4xl">€</span>
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <h3 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Descanso Pendiente</h3>
-                                            <p className="text-5xl font-black tracking-tighter text-indigo-400">{stats.global.restHours.toFixed(1)}<span className="text-sm ml-1">h</span></p>
-                                        </div>
+                                        <div><h3 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Acumulado Histórico</h3><p className="text-7xl md:text-8xl font-black tracking-tighter mb-4 leading-none">{Math.floor(stats.global.total).toLocaleString('es-ES')}<span className="text-indigo-500 text-4xl">€</span></p></div>
+                                        <div className="text-right"><h3 className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Descanso Pendiente</h3><p className="text-5xl font-black tracking-tighter text-indigo-400">{stats.global.restHours.toFixed(1)}<span className="text-sm ml-1">h</span></p></div>
                                     </div>
                                     <p className="text-slate-400 font-bold text-xs uppercase tracking-widest opacity-60 mt-8">Suma total de variables registrados</p>
                                 </div>
@@ -445,43 +453,21 @@
                         )}
                     </div>
 
-                    {/* Settings Modal */}
                     {ui.settings && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in">
-                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 border border-white/20">
+                            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 border border-white/20 relative">
+                                <button onClick={() => setUi({...ui, settings: false})} className="absolute top-6 right-6 p-3 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-2xl transition-colors"><Icon name="x" size={24} /></button>
                                 <h3 className="text-2xl font-black mb-8 flex items-center gap-3">Ajustes <Icon name="settings" size={20} /></h3>
                                 <div className="space-y-8">
-                                    <section>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-3 tracking-widest">Grupo Profesional</label>
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {Object.keys(SALARY_DATA).map(g => (
-                                                <button key={g} onClick={() => { const np = {...profile, group: g}; setProfile(np); save(np, 'profile'); }} className={`py-3 rounded-xl font-black text-xs border-2 transition-all ${profile.group === g ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{g}</button>
-                                            ))}
-                                        </div>
-                                    </section>
-                                    <section>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-3 tracking-widest">Nivel Salarial</label>
-                                        <div className="grid grid-cols-6 gap-2">
-                                            {[...Array(12)].map((_, i) => {
-                                                const lvl = String(i + 1);
-                                                return <button key={lvl} onClick={() => { const np = {...profile, level: lvl}; setProfile(np); save(np, 'profile'); }} className={`py-2.5 rounded-xl font-black text-[10px] border-2 transition-all ${profile.level === lvl ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{lvl}</button>;
-                                            })}
-                                        </div>
-                                    </section>
-                                    <section>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-3 tracking-widest">Km Centro (Base)</label>
-                                        <div className="relative">
-                                            <input type="number" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-2xl font-black text-slate-800 outline-none focus:border-indigo-200 transition-colors" value={profile.kmCount} onChange={e => { const np = {...profile, kmCount: parseFloat(e.target.value) || 0}; setProfile(np); save(np, 'profile'); }} />
-                                            <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-300 uppercase text-xs">Km</span>
-                                        </div>
-                                    </section>
+                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-3 tracking-widest">Grupo Profesional</label><div className="grid grid-cols-4 gap-2">{Object.keys(SALARY_DATA).map(g => (<button key={g} onClick={() => { const np = {...profile, group: g}; setProfile(np); save(np, 'profile'); }} className={`py-3 rounded-xl font-black text-xs border-2 transition-all ${profile.group === g ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{g}</button>))}</div></section>
+                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-3 tracking-widest">Nivel Salarial</label><div className="grid grid-cols-6 gap-2">{[...Array(12)].map((_, i) => { const lvl = String(i + 1); return <button key={lvl} onClick={() => { const np = {...profile, level: lvl}; setProfile(np); save(np, 'profile'); }} className={`py-2.5 rounded-xl font-black text-[10px] border-2 transition-all ${profile.level === lvl ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{lvl}</button>; })}</div></section>
+                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-3 tracking-widest">Km ida + vuelta</label><div className="relative"><input type="number" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-2xl font-black text-slate-800 outline-none focus:border-indigo-200" value={profile.kmCount} onChange={e => { const np = {...profile, kmCount: parseFloat(e.target.value) || 0}; setProfile(np); save(np, 'profile'); }} /><span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-300 uppercase text-xs">Km</span></div></section>
                                 </div>
-                                <button onClick={() => setUi({...ui, settings: false})} className="w-full mt-10 py-5 bg-slate-900 text-white font-black rounded-2xl uppercase text-xs tracking-widest shadow-lg">Guardar Cambios</button>
+                                <button onClick={() => setUi({...ui, settings: false})} className="w-full mt-10 py-5 bg-slate-900 text-white font-black rounded-2xl uppercase text-xs shadow-lg hover:bg-slate-800 transition-all">Guardar y Cerrar</button>
                             </div>
                         </div>
                     )}
 
-                    {/* Day Editor Modal */}
                     {ui.modal && selected && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in">
                             <div className="bg-white w-full max-w-2xl rounded-[48px] shadow-2xl overflow-hidden border border-white/10">
@@ -490,120 +476,18 @@
                                     <button onClick={() => setUi({...ui, modal: false})} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-colors"><Icon name="x" size={24} /></button>
                                 </div>
                                 <div className="p-8 max-h-[70vh] overflow-y-auto no-scrollbar space-y-8">
-                                    {/* Retén Switch */}
-                                    <section>
-                                        <div onClick={() => {
-                                            const nr = !selected.isReten;
-                                            const upd = {...selected, isReten: nr};
-                                            setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts');
-                                        }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer transition-all ${selected.isReten ? 'border-indigo-600 bg-indigo-50 shadow-lg' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
-                                            <div className="flex items-center gap-4"><div className={`p-3 rounded-xl ${selected.isReten ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}><Icon name="shield-check" size={24} /></div><h4 className="font-black uppercase text-sm tracking-tight">Estado de Retén</h4></div>
-                                            <div className={`w-8 h-8 rounded-full border-4 transition-all ${selected.isReten ? 'bg-indigo-600 border-indigo-200 scale-110' : 'bg-white border-slate-200'}`}></div>
-                                        </div>
-                                    </section>
-
-                                    {/* Shift Grid */}
-                                    <section>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Tipo de Turno</label>
-                                        <div className="grid grid-cols-5 gap-2">
-                                            {SHIFTS.map(s => (
-                                                <button key={s.id} onClick={() => {
-                                                    const d = new Date(selected.ds), f = d.getDay() === 0 || d.getDay() === 6;
-                                                    const upd = { ...selected, shift: s.id, 
-                                                        activeConceptsCount: (['R7', 'R9'].includes(s.id) ? {trc: 1, plus_llamada: 1, comp_llamada: 1, comida: 1, comp_km: 1} : ['S1', 'S3', 'S5'].includes(s.id) ? {trc: 1} : ['R1', 'R3'].includes(s.id) ? {tra: 1} : {}),
-                                                        extras: (s.id === 'R7' || s.id === 'R9' ? (f ? 12 : 3.5) : 0),
-                                                        horasNocturnas: (['R9', 'S5'].includes(s.id) ? 8 : ['R3', 'S3'].includes(s.id) ? 1 : 0)
-                                                    };
-                                                    setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts');
-                                                }} className={`py-3 rounded-xl border-2 font-black text-[10px] transition-all ${selected.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800 shadow-md scale-105' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>{s.id}</button>
-                                            ))}
-                                        </div>
-                                    </section>
-
-                                    {/* Quantifiable Concepts */}
-                                    <section>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Complementos (Cantidades)</label>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {[
-                                                { id: 'trc', l: 'Plus TRC', ic: 'activity' }, 
-                                                { id: 'tra', l: 'Plus TRA', ic: 'trending-up' }, 
-                                                { id: 'plus_llamada', l: 'Plus Llamada', ic: 'phone-incoming' }, 
-                                                { id: 'comp_llamada', l: 'Comp. Llamada', ic: 'phone-forwarded' }, 
-                                                { id: 'comida', l: 'Ayuda Comida', ic: 'utensils' }, 
-                                                { id: 'comp_km', l: 'Kilometraje', ic: 'map' }
-                                            ].map(c => {
-                                                const count = selected.activeConceptsCount?.[c.id] || 0;
-                                                const isDisabled = selected.isReten && c.id === 'comp_llamada';
-                                                
-                                                return (
-                                                    <div key={c.id} className={`flex flex-col bg-slate-50 p-4 rounded-3xl border-2 transition-all ${count > 0 ? 'border-indigo-200 bg-indigo-50/30' : 'border-slate-100'} ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}>
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-3">
-                                                                <Icon name={c.ic} size={18} className={count > 0 ? 'text-indigo-600' : 'text-slate-400'} />
-                                                                <span className={`text-[10px] font-black uppercase ${count > 0 ? 'text-indigo-900' : 'text-slate-500'}`}>{c.l}</span>
-                                                            </div>
-                                                            <div className="flex items-center bg-white rounded-2xl shadow-sm border border-slate-100 p-1">
-                                                                <button disabled={isDisabled} onClick={() => updateSelectedConcept(c.id, -1)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 disabled:opacity-0"><Icon name="minus" size={14} /></button>
-                                                                <span className="w-8 text-center font-black text-xs text-indigo-600">{count}</span>
-                                                                <button disabled={isDisabled} onClick={() => updateSelectedConcept(c.id, 1)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 disabled:opacity-0"><Icon name="plus" size={14} /></button>
-                                                            </div>
-                                                        </div>
-                                                        {c.id === 'comp_km' && count > 0 && (
-                                                            <div className="mt-4 pt-4 border-t border-indigo-100 animate-in">
-                                                                <label className="text-[8px] font-black text-indigo-400 uppercase mb-2 block tracking-widest">Añadir Km adicionales</label>
-                                                                <div className="flex items-center gap-3">
-                                                                    <input type="number" placeholder="0" className="w-full bg-white p-3 rounded-xl border border-indigo-100 font-black text-indigo-600 text-center text-sm outline-none" value={selected.extraKm || ''} onChange={e => {
-                                                                        const v = parseFloat(e.target.value) || 0;
-                                                                        const upd = {...selected, extraKm: v};
-                                                                        setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts');
-                                                                    }} />
-                                                                    <span className="text-[10px] font-black text-indigo-300">KM</span>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </section>
-
-                                    {/* Hours & Compensation Section */}
-                                    <section className="space-y-6">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Extras (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200" value={selected.extras || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, extras: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div>
-                                            <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Noche (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200" value={selected.horasNocturnas || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, horasNocturnas: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div>
-                                        </div>
-
-                                        {(parseFloat(selected.extras) > 0) && (
-                                            <div className="bg-indigo-50 p-6 rounded-[32px] border-2 border-indigo-100 animate-in">
-                                                <label className="text-[10px] font-black uppercase text-indigo-600 block mb-4 tracking-widest">¿Cómo compensar las extras?</label>
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                                    <button onClick={() => { const upd = {...selected, extraCompMode: 'money'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'money' || !selected.extraCompMode ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Cobro 100%</button>
-                                                    
-                                                    <button onClick={() => { const upd = {...selected, extraCompMode: 'rest_total'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'rest_total' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Descanso Total</button>
-                                                    
-                                                    <button disabled={new Date(selected.ds).getDay() === 0 || new Date(selected.ds).getDay() === 6 || parseFloat(selected.horasNocturnas) > 0} onClick={() => { const upd = {...selected, extraCompMode: 'mixed'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'mixed' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'} disabled:opacity-30 disabled:cursor-not-allowed`}>Mixto (Desc + 0.75)</button>
-                                                </div>
-                                                <p className="mt-3 text-[8px] font-bold text-indigo-400 uppercase italic">
-                                                    {(new Date(selected.ds).getDay() === 0 || new Date(selected.ds).getDay() === 6 || parseFloat(selected.horasNocturnas) > 0) 
-                                                        ? "* Día Festivo/Nocturno: Factor 2.0x" 
-                                                        : "* Día Laboral: Factor 1.75x o Mixto"}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </section>
+                                    <section><div onClick={() => { const nr = !selected.isReten; const upd = {...selected, isReten: nr}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer transition-all ${selected.isReten ? 'border-indigo-600 bg-indigo-50 shadow-lg' : 'border-slate-100 bg-slate-50 opacity-60'}`}><div className="flex items-center gap-4"><div className={`p-3 rounded-xl ${selected.isReten ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}><Icon name="shield-check" size={24} /></div><h4 className="font-black uppercase text-sm tracking-tight">Estado de Retén</h4></div><div className={`w-8 h-8 rounded-full border-4 transition-all ${selected.isReten ? 'bg-indigo-600 border-indigo-200 scale-110' : 'bg-white border-slate-200'}`}></div></div></section>
+                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Tipo de Turno</label><div className="grid grid-cols-5 gap-2">{SHIFTS.map(s => (<button key={s.id} onClick={() => { const d = new Date(selected.ds), f = d.getDay() === 0 || d.getDay() === 6; const upd = { ...selected, shift: s.id, activeConceptsCount: (['R7', 'R9'].includes(s.id) ? {trc: 1, plus_llamada: 1, comp_llamada: 1, comida: 1, comp_km: 1, otros: 0} : ['S1', 'S3', 'S5'].includes(s.id) ? {trc: 1, otros: 0} : ['R1', 'R3'].includes(s.id) ? {tra: 1, otros: 0} : {otros: 0}), extras: (s.id === 'R7' || s.id === 'R9' ? (f ? 12 : 3.5) : 0), horasNocturnas: (['R9', 'S5'].includes(s.id) ? 8 : ['R3', 'S3'].includes(s.id) ? 1 : 0) }; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[10px] transition-all ${selected.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800 shadow-md scale-105' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>{s.id}</button>))}</div></section>
+                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Complementos (Cantidades)</label><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[{ id: 'trc', l: 'Plus TRC', ic: 'activity' }, { id: 'tra', l: 'Plus TRA', ic: 'trending-up' }, { id: 'plus_llamada', l: 'Plus Llamada', ic: 'phone-incoming' }, { id: 'comp_llamada', l: 'Comp. Llamada', ic: 'phone-forwarded' }, { id: 'comida', l: 'Ayuda Comida', ic: 'utensils' }, { id: 'comp_km', l: 'Kilometraje', ic: 'map' }, { id: 'otros', l: 'Otros', ic: 'plus-circle' }].map(c => { const count = selected.activeConceptsCount?.[c.id] || 0; const isDisabled = selected.isReten && c.id === 'comp_llamada'; return (<div key={c.id} className={`flex flex-col bg-slate-50 p-4 rounded-3xl border-2 transition-all ${count > 0 ? 'border-indigo-200 bg-indigo-50/30' : 'border-slate-100'} ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}><div className="flex items-center justify-between"><div className="flex items-center gap-3"><Icon name={c.ic} size={18} className={count > 0 ? 'text-indigo-600' : 'text-slate-400'} /><span className={`text-[10px] font-black uppercase ${count > 0 ? 'text-indigo-900' : 'text-slate-500'}`}>{c.l}</span></div><div className="flex items-center bg-white rounded-2xl shadow-sm border border-slate-100 p-1"><button disabled={isDisabled} onClick={() => updateSelectedConcept(c.id, -1)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 disabled:opacity-0"><Icon name="minus" size={14} /></button><span className="w-8 text-center font-black text-xs text-indigo-600">{count}</span><button disabled={isDisabled} onClick={() => updateSelectedConcept(c.id, 1)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 disabled:opacity-0"><Icon name="plus" size={14} /></button></div></div>{c.id === 'otros' && count > 0 && (<div className="mt-4 space-y-4 animate-in border-t border-indigo-100 pt-4">{(selected.manualEntries || []).slice(0, count).map((entry, idx) => (<div key={idx} className="space-y-2"><div className="flex items-center gap-2"><input type="text" placeholder="Concepto" className="w-full bg-white p-2 rounded-xl border border-indigo-100 font-bold text-[10px] text-indigo-900 outline-none" value={entry.label} onChange={e => { const entries = [...selected.manualEntries]; entries[idx] = { ...entries[idx], label: e.target.value }; const upd = { ...selected, manualEntries: entries }; setSelected(upd); const ns = { ...shifts, [upd.ds]: upd }; setShifts(ns); save(ns, 'shifts'); }} /><input type="number" placeholder="0" className="w-20 bg-white p-2 rounded-xl border border-indigo-100 font-black text-indigo-600 text-center text-[10px] outline-none" value={entry.value || ''} onChange={e => { const entries = [...selected.manualEntries]; entries[idx] = { ...entries[idx], value: parseFloat(e.target.value) || 0 }; const upd = { ...selected, manualEntries: entries }; setSelected(upd); const ns = { ...shifts, [upd.ds]: upd }; setShifts(ns); save(ns, 'shifts'); }} /><span className="text-[10px] font-black text-indigo-300">€</span></div></div>))}</div>)}{c.id === 'comp_km' && count > 0 && (<div className="mt-4 pt-4 border-t border-indigo-100 animate-in"><label className="text-[8px] font-black text-indigo-400 uppercase mb-2 block tracking-widest">Km adicionales</label><div className="flex items-center gap-3"><input type="number" placeholder="0" className="w-full bg-white p-3 rounded-xl border border-indigo-100 font-black text-indigo-600 text-center text-sm outline-none" value={selected.extraKm || ''} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, extraKm: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /><span className="text-[10px] font-black text-indigo-300">KM</span></div></div>)}</div>); })}</div></section>
+                                    <section className="space-y-6"><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Extras (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200" value={selected.extras || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, extras: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Noche (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200" value={selected.horasNocturnas || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, horasNocturnas: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div></div>{(parseFloat(selected.extras) > 0) && (<div className="bg-indigo-50 p-6 rounded-[32px] border-2 border-indigo-100 animate-in"><label className="text-[10px] font-black uppercase text-indigo-600 block mb-4 tracking-widest">¿Cómo compensar las extras?</label><div className="grid grid-cols-1 md:grid-cols-3 gap-2"><button onClick={() => { const upd = {...selected, extraCompMode: 'money'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'money' || !selected.extraCompMode ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Pago</button><button onClick={() => { const upd = {...selected, extraCompMode: 'rest_total'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'rest_total' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Descanso</button><button disabled={new Date(selected.ds).getDay() === 0 || new Date(selected.ds).getDay() === 6 || parseFloat(selected.horasNocturnas) > 0} onClick={() => { const upd = {...selected, extraCompMode: 'mixed'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'mixed' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'} disabled:opacity-30`}>Mixto</button></div></div>)}</section>
                                 </div>
-                                <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                                    <button onClick={() => { const ns = {...shifts}; delete ns[selected.ds]; setShifts(ns); save(ns, 'shifts'); setUi({...ui, modal: false}); }} className="px-6 py-4 bg-red-50 text-red-600 font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-red-100 transition-colors">Borrar Día</button>
-                                    <button onClick={() => setUi({...ui, modal: false})} className="px-10 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-lg hover:bg-slate-800 transition-all active:scale-95">Listo</button>
-                                </div>
+                                <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3"><button onClick={() => { const ns = {...shifts}; delete ns[selected.ds]; setShifts(ns); save(ns, 'shifts'); setUi({...ui, modal: false}); }} className="px-6 py-4 bg-red-50 text-red-600 font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-red-100 transition-colors">Borrar</button><button onClick={() => setUi({...ui, modal: false})} className="px-10 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase text-[10px] shadow-lg hover:bg-slate-800 active:scale-95 transition-all">Listo</button></div>
                             </div>
                         </div>
                     )}
                 </div>
             );
         };
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
