@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANAV ShiftExpert v7.2 - Estadísticas con Leyenda</title>
+    <title>ANAV ShiftExpert v7.3 - Renombrado S3/S5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -75,8 +75,8 @@
             { id: 'R7', color: 'bg-pink-100 text-pink-800', desc: 'R7 TRC 12h', time: '07:00 a 19:00' },
             { id: 'R9', color: 'bg-blue-100 text-blue-800', desc: 'R9 TRC 12h', time: '19:00 a 07:00' },
             { id: 'S1', color: 'bg-orange-100 text-orange-800', desc: 'Cerrado Recarga Mañana', time: '06:00 a 14:00' },
-            { id: 'S2', color: 'bg-green-100 text-green-800', desc: 'Cerrado Recarga Tarde', time: '14:00 a 22:00' },
-            { id: 'S3', color: 'bg-purple-100 text-purple-800', desc: 'Cerrado Recarga Noche', time: '22:00 a 06:00' },
+            { id: 'S3', color: 'bg-green-100 text-green-800', desc: 'Cerrado Recarga Tarde', time: '14:00 a 22:00' },
+            { id: 'S5', color: 'bg-purple-100 text-purple-800', desc: 'Cerrado Recarga Noche', time: '22:00 a 06:00' },
         ];
 
         const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -171,7 +171,8 @@
                     if (isR7R9 && isRestricted && !isF) return;
 
                     if (id === 'trc') {
-                        const m = data.shift === 'R7' ? 1.5 : data.shift === 'R9' ? 2.5 : ['S2', 'S3'].includes(data.shift) ? (isF ? 3 : 2) : ['S1'].includes(data.shift) ? (isF ? 2 : 1) : 1;
+                        // Actualizado: S3 y S5 para el multiplicador 2x/3x
+                        const m = data.shift === 'R7' ? 1.5 : data.shift === 'R9' ? 2.5 : ['S3', 'S5'].includes(data.shift) ? (isF ? 3 : 2) : ['S1'].includes(data.shift) ? (isF ? 2 : 1) : 1;
                         add(`Plus TRC ${m}x (x${count})`, (GLOBAL_CONST.TRC * m) * count, 'trc');
                     }
                     if (id === 'tra') add(`Plus TRA ${isF ? 3 : 2}x (x${count})`, (GLOBAL_CONST.TRA * (isF ? 3 : 2)) * count, 'tra');
@@ -325,7 +326,6 @@
                         {ui.tab === 'calendar' ? (
                             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                                 <div className="lg:col-span-3 bg-white shadow-xl rounded-[40px] overflow-hidden border border-slate-100 animate-in">
-                                    {/* Cabecera Mes */}
                                     <div className="flex justify-center p-6 border-b border-slate-50">
                                         <div className="flex items-center bg-slate-50 border border-slate-100 rounded-full p-1">
                                             <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))} className="p-3 hover:bg-white rounded-full transition-all hover:shadow-sm"><Icon name="chevron-left" /></button>
@@ -437,9 +437,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    
                                     <div className="flex flex-col md:flex-row items-center justify-center gap-12 p-6">
-                                        {/* Gráfico */}
                                         <div className="w-64 h-64 relative shrink-0">
                                             <PieChart data={[
                                                 { label: 'TRC', value: stats.month.trc, color: '#6366f1' }, 
@@ -458,8 +456,6 @@
                                                 <span className="text-2xl font-black text-slate-900 tracking-tighter">{Math.round(stats.month.total)}€</span>
                                             </div>
                                         </div>
-
-                                        {/* LEYENDA DETALLADA */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 w-full max-w-xl">
                                             {[
                                                 { label: 'Plus TRC', value: stats.month.trc, color: '#6366f1' }, 
@@ -488,7 +484,6 @@
                         )}
                     </div>
 
-                    {/* Modales y Ajustes se mantienen igual */}
                     {ui.settings && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in">
                             <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 border border-white/20 relative">
@@ -512,7 +507,6 @@
                                     <button onClick={() => setUi({...ui, modal: false})} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-colors"><Icon name="x" size={24} /></button>
                                 </div>
                                 <div className="p-8 max-h-[70vh] overflow-y-auto no-scrollbar space-y-8">
-                                    {/* Toggles */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <section>
                                             <div onClick={() => { const nr = !selected.isReten; const upd = {...selected, isReten: nr}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer transition-all ${selected.isReten ? 'border-indigo-600 bg-indigo-50 shadow-lg' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
@@ -538,22 +532,19 @@
                                             </div>
                                         </section>
                                     </div>
-                                    
-                                    {/* Turnos */}
                                     <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Tipo de Turno</label><div className="grid grid-cols-5 gap-2">{SHIFTS.map(s => (<button key={s.id} onClick={() => { 
                                         const d = new Date(selected.ds), f = d.getDay() === 0 || d.getDay() === 6 || selected.isFestive; 
                                         const upd = { ...selected, shift: s.id, 
                                             activeConceptsCount: (['R7', 'R9'].includes(s.id) 
                                                 ? (f ? {trc: 1, plus_llamada: 1, comp_llamada: 1, comida: 1, comp_km: 1, otros: 0} : {trc: 1, comida: 1, otros: 0}) 
-                                                : ['S1', 'S2', 'S3'].includes(s.id) ? {trc: 1, otros: 0} 
+                                                : ['S1', 'S3', 'S5'].includes(s.id) ? {trc: 1, otros: 0} 
                                                 : ['R1', 'R3'].includes(s.id) ? {tra: 1, otros: 0} : {otros: 0}), 
                                             extras: (s.id === 'R7' || s.id === 'R9' ? (f ? 12 : 3.5) : 0), 
-                                            horasNocturnas: (['S3'].includes(s.id) ? 8 : ['R3', 'S2'].includes(s.id) ? 1 : 0) 
+                                            // Actualizado: S5 noche 8h, S3 tarde 1h
+                                            horasNocturnas: (['S5'].includes(s.id) ? 8 : ['R3', 'S3'].includes(s.id) ? 1 : 0) 
                                         }; 
                                         setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); 
                                     }} className={`py-3 rounded-xl border-2 font-black text-[10px] transition-all ${selected.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800 shadow-md scale-105' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>{s.id}</button>))}</div></section>
-                                    
-                                    {/* Conceptos */}
                                     <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Complementos (Cantidades)</label><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[{ id: 'trc', l: 'Plus TRC', ic: 'activity' }, { id: 'tra', l: 'Plus TRA', ic: 'trending-up' }, { id: 'plus_llamada', l: 'Plus Llamada', ic: 'phone-incoming' }, { id: 'comp_llamada', l: 'Comp. Llamada', ic: 'phone-forwarded' }, { id: 'comida', l: 'Ayuda Comida', ic: 'utensils' }, { id: 'comp_km', l: 'Kilometraje', ic: 'map' }, { id: 'otros', l: 'Otros', ic: 'plus-circle' }].map(c => { 
                                         const count = selected.activeConceptsCount?.[c.id] || 0; 
                                         const d = new Date(selected.ds), f = d.getDay() === 0 || d.getDay() === 6 || selected.isFestive;
@@ -561,8 +552,6 @@
                                         const isRestricted = ['comp_km', 'plus_llamada', 'comp_llamada'].includes(c.id);
                                         const isDisabled = (selected.isReten && c.id === 'comp_llamada') || (isR7R9 && isRestricted && !f); 
                                         return (<div key={c.id} className={`flex flex-col bg-slate-50 p-4 rounded-3xl border-2 transition-all ${count > 0 ? 'border-indigo-200 bg-indigo-50/30' : 'border-slate-100'} ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}><div className="flex items-center justify-between"><div className="flex items-center gap-3"><Icon name={c.ic} size={18} className={count > 0 ? 'text-indigo-600' : 'text-slate-400'} /><span className={`text-[10px] font-black uppercase ${count > 0 ? 'text-indigo-900' : 'text-slate-500'}`}>{c.l}</span></div><div className="flex items-center bg-white rounded-2xl shadow-sm border border-slate-100 p-1"><button disabled={isDisabled} onClick={() => updateSelectedConcept(c.id, -1)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 disabled:opacity-0"><Icon name="minus" size={14} /></button><span className="w-8 text-center font-black text-xs text-indigo-600">{count}</span><button disabled={isDisabled} onClick={() => updateSelectedConcept(c.id, 1)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 disabled:opacity-0"><Icon name="plus" size={14} /></button></div></div></div>); })}</div></section>
-                                    
-                                    {/* Extras / Noche */}
                                     <section className="space-y-6"><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Extras (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200" value={selected.extras || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, extras: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Noche (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200" value={selected.horasNocturnas || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, horasNocturnas: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div></div></section>
                                 </div>
                                 <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3"><button onClick={() => { const ns = {...shifts}; delete ns[selected.ds]; setShifts(ns); save(ns, 'shifts'); setUi({...ui, modal: false}); }} className="px-6 py-4 bg-red-50 text-red-600 font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-red-100 transition-colors">Borrar</button><button onClick={() => setUi({...ui, modal: false})} className="px-10 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase text-[10px] shadow-lg hover:bg-slate-800 active:scale-95 transition-all">Listo</button></div>
