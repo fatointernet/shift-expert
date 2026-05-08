@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANAV ShiftExpert v8.7 - Identidad de Usuario</title>
+    <title>ANAV ShiftExpert v8.8 - Compensación Mixta</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -217,7 +217,12 @@
                     if (h > 0) {
                         const isNightOrFestive = isF || (parseFloat(data.horasNocturnas) > 0);
                         const compMode = data.extraCompMode || 'money';
-                        if (isNightOrFestive) {
+                        
+                        if (compMode === 'mixed') {
+                            res.restHours += h * 1;
+                            res.items.push({ label: `Descanso HE (1x)`, value: h * 1, type: 'coffee' });
+                            add(`HE Parte Pago (0.75x)`, h * rates.extra * 0.75, 'clock');
+                        } else if (isNightOrFestive) {
                             if (compMode === 'rest_total') {
                                 res.restHours += h * 2;
                                 res.items.push({ label: `Descanso HE (2x)`, value: h * 2, type: 'coffee' });
@@ -365,14 +370,14 @@
                             <Icon name="user" size={12} className="text-indigo-500" />
                             <span className="text-white">Sesión activa: {user.email}</span>
                         </div>
-                        <div className="hidden md:block italic opacity-50">ANAV ShiftExpert v8.7</div>
+                        <div className="hidden md:block italic opacity-50">ANAV ShiftExpert v8.8</div>
                     </div>
 
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="flex items-center gap-5">
                                 <div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div>
-                                <div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v8.7</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Calculadora de Jornada</p></div>
+                                <div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v8.8</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Calculadora de Jornada</p></div>
                             </div>
                             <div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden">
                                 {['calendar', 'stats', 'precios'].map(t => (
@@ -672,8 +677,31 @@
                                         </section>
                                     )}
 
-                                    <section className="space-y-6"><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Extras (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200 transition-all" value={selected.extras || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, extras: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Noche (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200 transition-all" value={selected.horasNocturnas || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, horasNocturnas: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div></div>
-                                    {(parseFloat(selected.extras) > 0) && (<div className="bg-indigo-50 p-6 rounded-[32px] border-2 border-indigo-100 animate-in"><label className="text-[10px] font-black uppercase text-indigo-600 block mb-4 tracking-widest">Compensación HE</label><div className="grid grid-cols-2 gap-2"><button onClick={() => { const upd = {...selected, extraCompMode: 'money'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode !== 'rest_total' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Pago</button><button onClick={() => { const upd = {...selected, extraCompMode: 'rest_total'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'rest_total' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Descanso</button></div></div>)}
+                                    <section className="space-y-6"><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Extras (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200 transition-all" value={selected.extras || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, extras: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Noche (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200 transition-all" value={selected.horasNocturnas || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, extras: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div></div>
+                                    {(parseFloat(selected.extras) > 0) && (
+                                        <div className="bg-indigo-50 p-6 rounded-[32px] border-2 border-indigo-100 animate-in">
+                                            <label className="text-[10px] font-black uppercase text-indigo-600 block mb-4 tracking-widest">Compensación HE</label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <button onClick={() => { 
+                                                    const upd = {...selected, extraCompMode: 'money'}; 
+                                                    setSelected(upd); 
+                                                    const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); 
+                                                }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'money' || !selected.extraCompMode ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Pago</button>
+                                                
+                                                <button onClick={() => { 
+                                                    const upd = {...selected, extraCompMode: 'rest_total'}; 
+                                                    setSelected(upd); 
+                                                    const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); 
+                                                }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'rest_total' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Descanso</button>
+                                                
+                                                <button onClick={() => { 
+                                                    const upd = {...selected, extraCompMode: 'mixed'}; 
+                                                    setSelected(upd); 
+                                                    const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); 
+                                                }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'mixed' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Cobrar+Comp</button>
+                                            </div>
+                                        </div>
+                                    )}
                                     </section>
                                 </div>
                                 <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3"><button onClick={() => { const ns = {...shifts}; delete ns[selected.ds]; setShifts(ns); save(ns, 'shifts'); setUi({...ui, modal: false}); }} className="px-6 py-4 bg-red-50 text-red-600 font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-red-100 transition-colors">Borrar</button><button onClick={() => setUi({...ui, modal: false})} className="px-10 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase text-[10px] shadow-lg hover:bg-slate-800 active:scale-95 transition-all">Listo</button></div>
