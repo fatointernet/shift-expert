@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANAV ShiftExpert v8.3 - Desglose Detallado</title>
+    <title>ANAV ShiftExpert v8.7 - Identidad de Usuario</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -194,10 +194,18 @@
                     if (id === 'comp_llamada' && !data.isReten) add(`Comp. Llamada (x${count})`, (isF ? globalRates.CALL_F : globalRates.CALL_L) * count, 'phone');
                     if (id === 'comida') add(`Ayuda Comida (x${count})`, globalRates.FOOD * count, 'food');
                     if (id === 'comp_km') {
-                        const totalKm = (profile.kmCount * count) + (parseFloat(data.extraKm) || 0);
-                        add(`Kilometraje (${totalKm}km)`, totalKm * globalRates.KM_PRICE, 'map');
+                        const manualKm = (data.mileageEntries || []).reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
+                        const baseKm = count * (profile.kmCount || 0);
+                        const totalKm = baseKm + manualKm;
+                        if (totalKm > 0) add(`Kilometraje (${totalKm}km)`, totalKm * globalRates.KM_PRICE, 'map');
                     }
                 });
+
+                if (data.manualEntries && data.manualEntries.length > 0) {
+                    data.manualEntries.forEach(entry => {
+                        if (entry.value > 0) add(entry.label || 'Otro Concepto', entry.value, 'custom');
+                    });
+                }
 
                 if (data.shift === 'P1') {
                     const p1Val = isFriday ? globalRates.P1_FRI : globalRates.P1_BASE;
@@ -227,7 +235,7 @@
                     if (n > 0) add(`Nocturnidad ${n}h`, n * rates.night, 'moon');
                 }
                 return res;
-            }, [rates, profile.kmCount, globalRates]);
+            }, [rates, globalRates, profile.kmCount]);
 
             const stats = useMemo(() => {
                 const s = { month: { total: 0, trc: 0, tra: 0, call: 0, food: 0, km: 0, he: 0, night: 0, reten: 0, restHours: 0, custom: 0, p1: 0 } };
@@ -246,6 +254,7 @@
                             else if (i.type === 'moon') s.month.night += i.value;
                             else if (i.type === 'shield') s.month.reten += i.value;
                             else if (i.type === 'p1_bonus') s.month.p1 += i.value;
+                            else if (i.type === 'custom') s.month.custom += i.value;
                         });
                     }
                 });
@@ -350,11 +359,20 @@
 
             return (
                 <div className="min-h-screen bg-slate-50 pb-20">
+                    {/* BARRA DE USUARIO SUPERIOR (GLOBAL) */}
+                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md">
+                        <div className="flex items-center gap-2">
+                            <Icon name="user" size={12} className="text-indigo-500" />
+                            <span className="text-white">Sesión activa: {user.email}</span>
+                        </div>
+                        <div className="hidden md:block italic opacity-50">ANAV ShiftExpert v8.7</div>
+                    </div>
+
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="flex items-center gap-5">
                                 <div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div>
-                                <div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v8.3</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Calculadora de Jornada</p></div>
+                                <div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v8.7</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Calculadora de Jornada</p></div>
                             </div>
                             <div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden">
                                 {['calendar', 'stats', 'precios'].map(t => (
@@ -429,7 +447,8 @@
                                                 { l: 'Horas Extra (Pago)', v: stats.month.he, s: '€' },
                                                 { l: 'Plus TRC', v: stats.month.trc, s: '€' },
                                                 { l: 'Plus TRA', v: stats.month.tra, s: '€' },
-                                                { l: 'Llamadas/Comp.', v: stats.month.call, s: '€' }
+                                                { l: 'Llamadas/Comp.', v: stats.month.call, s: '€' },
+                                                { l: 'Otros Conceptos', v: stats.month.custom, s: '€' }
                                             ].map(i => i.v > 0 || i.l === 'Bruto Variable' ? (
                                                 <div key={i.l} className="flex flex-col">
                                                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{i.l}</span>
@@ -475,7 +494,8 @@
                                                     { label: 'H. Extras', value: stats.month.he, color: '#8b5cf6' },
                                                     { label: 'Nocturna', value: stats.month.night, color: '#334155' }, 
                                                     { label: 'Retén', value: stats.month.reten, color: '#4f46e5' },
-                                                    { label: 'Plus P1', value: stats.month.p1, color: '#94a3b8' }
+                                                    { label: 'Plus P1', value: stats.month.p1, color: '#94a3b8' },
+                                                    { label: 'Otros', value: stats.month.custom, color: '#cbd5e1' }
                                                 ]} />
                                             </div>
                                         </div>
@@ -490,7 +510,8 @@
                                             { label: 'Horas Extras', value: stats.month.he, color: '#8b5cf6' },
                                             { label: 'Nocturnidad', value: stats.month.night, color: '#334155' }, 
                                             { label: 'Retén Total', value: stats.month.reten, color: '#4f46e5' },
-                                            { label: 'Plus P1', value: stats.month.p1, color: '#94a3b8' }
+                                            { label: 'Plus P1', value: stats.month.p1, color: '#94a3b8' },
+                                            { label: 'Otros Conceptos', value: stats.month.custom, color: '#cbd5e1' }
                                         ].map((i, idx) => (
                                             <div key={idx} className={`flex items-center justify-between p-4 rounded-3xl bg-slate-50 border border-slate-100 ${i.value > 0 ? 'opacity-100' : 'opacity-40 grayscale'}`}>
                                                 <div className="flex items-center gap-4">
@@ -516,7 +537,7 @@
                                 <div className="space-y-8">
                                     <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Grupo Profesional</label><div className="grid grid-cols-4 gap-2">{Object.keys(salaryMatrix).map(g => (<button key={g} onClick={() => { const np = {...profile, group: g}; setProfile(np); save(np, 'profile'); }} className={`py-4 rounded-2xl font-black text-xs border-2 transition-all ${profile.group === g ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{g}</button>))}</div></section>
                                     <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Nivel Salarial</label><div className="grid grid-cols-6 gap-2">{[...Array(12)].map((_, i) => { const lvl = String(i + 1); return <button key={lvl} onClick={() => { const np = {...profile, level: lvl}; setProfile(np); save(np, 'profile'); }} className={`py-3 rounded-xl font-black text-[10px] border-2 transition-all ${profile.level === lvl ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>{lvl}</button>; })}</div></section>
-                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Km ida + vuelta (Hogar-Planta)</label><div className="relative"><input type="number" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-2xl font-black text-slate-800 outline-none focus:border-indigo-200" value={profile.kmCount} onChange={e => { const np = {...profile, kmCount: parseFloat(e.target.value) || 0}; setProfile(np); save(np, 'profile'); }} /><span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-300 uppercase text-xs">Km</span></div></section>
+                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Km ida + vuelta (Base)</label><div className="relative"><input type="number" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-2xl font-black text-slate-800 outline-none focus:border-indigo-200" value={profile.kmCount} onChange={e => { const np = {...profile, kmCount: parseFloat(e.target.value) || 0}; setProfile(np); save(np, 'profile'); }} /><span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-300 uppercase text-xs">Km</span></div></section>
                                 </div>
                                 <button onClick={() => setUi({...ui, settings: false})} className="w-full mt-10 py-5 bg-slate-900 text-white font-black rounded-3xl uppercase text-xs shadow-xl hover:bg-slate-800 transition-all">Listo</button>
                             </div>
@@ -555,17 +576,102 @@
                                         const upd = { ...selected, shift: s.id, 
                                             activeConceptsCount: (['R7', 'R9'].includes(s.id) ? (f ? {trc: 1, plus_llamada: 1, comp_llamada: 1, comida: 1, comp_km: 1} : {trc: 1, comida: 1}) : ['S1', 'S3', 'S5'].includes(s.id) ? {trc: 1} : ['R1', 'R3'].includes(s.id) ? {tra: 1} : {}), 
                                             extras: (s.id === 'R7' || s.id === 'R9' ? (f ? 12 : 3.5) : 0), 
-                                            horasNocturnas: (['S5'].includes(s.id) ? 8 : ['R3', 'S3'].includes(s.id) ? 1 : 0) 
+                                            horasNocturnas: (['S5'].includes(s.id) ? 8 : ['R3', 'S3'].includes(s.id) ? 1 : 0),
+                                            mileageEntries: (selected.mileageEntries || []) 
                                         }; 
                                         setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); 
                                     }} className={`py-3 rounded-xl border-2 font-black text-[10px] transition-all ${selected.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800 shadow-md scale-105' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>{s.id}</button>))}</div></section>
-                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Complementos (Cantidades)</label><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[{ id: 'trc', l: 'Plus TRC', ic: 'activity' }, { id: 'tra', l: 'Plus TRA', ic: 'trending-up' }, { id: 'plus_llamada', l: 'Plus Llamada', ic: 'phone-incoming' }, { id: 'comp_llamada', l: 'Comp. Llamada', ic: 'phone-forwarded' }, { id: 'comida', l: 'Ayuda Comida', ic: 'utensils' }, { id: 'comp_km', l: 'Kilometraje', ic: 'map' }].map(c => { 
+                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Complementos (Cantidades)</label><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[{ id: 'trc', l: 'Plus TRC', ic: 'activity' }, { id: 'tra', l: 'Plus TRA', ic: 'trending-up' }, { id: 'plus_llamada', l: 'Plus Llamada', ic: 'phone-incoming' }, { id: 'comp_llamada', l: 'Comp. Llamada', ic: 'phone-forwarded' }, { id: 'comida', l: 'Ayuda Comida', ic: 'utensils' }, { id: 'comp_km', l: 'Kilometraje', ic: 'map' }, { id: 'otros', l: 'OTROS', ic: 'plus-circle' }].map(c => { 
                                         const count = selected.activeConceptsCount?.[c.id] || 0; 
                                         const d = new Date(selected.ds), f = d.getDay() === 0 || d.getDay() === 6 || selected.isFestive;
                                         const isR7R9 = selected.shift === 'R7' || selected.shift === 'R9';
                                         const isRestricted = ['comp_km', 'plus_llamada', 'comp_llamada'].includes(c.id);
                                         const isDisabled = (selected.isReten && c.id === 'comp_llamada') || (isR7R9 && isRestricted && !f); 
-                                        return (<div key={c.id} className={`flex flex-col bg-slate-50 p-4 rounded-3xl border-2 transition-all ${count > 0 ? 'border-indigo-200 bg-indigo-50/30' : 'border-slate-100'} ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}><div className="flex items-center justify-between"><div className="flex items-center gap-3"><Icon name={c.ic} size={18} className={count > 0 ? 'text-indigo-600' : 'text-slate-400'} /><span className={`text-[10px] font-black uppercase ${count > 0 ? 'text-indigo-900' : 'text-slate-500'}`}>{c.l}</span></div><div className="flex items-center bg-white rounded-2xl shadow-sm border border-slate-100 p-1"><button disabled={isDisabled} onClick={() => { const upd = {...selected, activeConceptsCount: {...selected.activeConceptsCount, [c.id]: Math.max(0, count - 1)}}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 disabled:opacity-0"><Icon name="minus" size={14} /></button><span className="w-8 text-center font-black text-xs text-indigo-600">{count}</span><button disabled={isDisabled} onClick={() => { const upd = {...selected, activeConceptsCount: {...selected.activeConceptsCount, [c.id]: count + 1}}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 disabled:opacity-0"><Icon name="plus" size={14} /></button></div></div></div>); })}</div></section>
+                                        return (<div key={c.id} className={`flex flex-col bg-slate-50 p-4 rounded-3xl border-2 transition-all ${count > 0 ? 'border-indigo-200 bg-indigo-50/30' : 'border-slate-100'} ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}><div className="flex items-center justify-between"><div className="flex items-center gap-3"><Icon name={c.ic} size={18} className={count > 0 ? 'text-indigo-600' : 'text-slate-400'} /><span className={`text-[10px] font-black uppercase ${count > 0 ? 'text-indigo-900' : 'text-slate-500'}`}>{c.l}</span></div><div className="flex items-center bg-white rounded-2xl shadow-sm border border-slate-100 p-1"><button disabled={isDisabled} onClick={() => { 
+                                            let manualEntries = [...(selected.manualEntries || [])];
+                                            let mileageEntries = [...(selected.mileageEntries || [])];
+                                            if (c.id === 'otros' && manualEntries.length > 0) manualEntries.pop();
+                                            if (c.id === 'comp_km' && mileageEntries.length > 0) mileageEntries.pop();
+                                            const upd = {...selected, manualEntries, mileageEntries, activeConceptsCount: {...selected.activeConceptsCount, [c.id]: Math.max(0, count - 1)}}; 
+                                            setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); 
+                                        }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 disabled:opacity-0"><Icon name="minus" size={14} /></button><span className="w-8 text-center font-black text-xs text-indigo-600">{count}</span><button disabled={isDisabled} onClick={() => { 
+                                            let manualEntries = [...(selected.manualEntries || [])];
+                                            let mileageEntries = [...(selected.mileageEntries || [])];
+                                            if (c.id === 'otros') manualEntries.push({ label: '', value: 0 });
+                                            if (c.id === 'comp_km') mileageEntries.push(0);
+                                            const upd = {...selected, manualEntries, mileageEntries, activeConceptsCount: {...selected.activeConceptsCount, [c.id]: count + 1}}; 
+                                            setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); 
+                                        }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 disabled:opacity-0"><Icon name="plus" size={14} /></button></div></div></div>); })}</div>
+                                    </section>
+
+                                    {/* SECCIÓN KILOMETRAJE MANUAL (SOLO SI SE PULSA +) */}
+                                    {(selected.activeConceptsCount?.comp_km > 0 && selected.mileageEntries && selected.mileageEntries.length > 0) && (
+                                        <section className="bg-blue-50/50 p-6 rounded-[32px] border-2 border-blue-100 space-y-4 animate-in">
+                                            <label className="text-[10px] font-black uppercase text-blue-600 block mb-2 tracking-widest flex items-center gap-2"><Icon name="map" size={14}/> Kilómetros Extra (Añadidos Manualmente)</label>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                {(selected.mileageEntries || []).map((km, idx) => (
+                                                    <div key={idx} className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            placeholder="Km" 
+                                                            className="w-full bg-white p-4 rounded-2xl border border-blue-100 text-sm font-black outline-none focus:border-blue-400 text-center"
+                                                            value={km || ''}
+                                                            onChange={e => {
+                                                                const newKm = [...selected.mileageEntries];
+                                                                newKm[idx] = parseFloat(e.target.value) || 0;
+                                                                const upd = {...selected, mileageEntries: newKm};
+                                                                setSelected(upd);
+                                                                const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts');
+                                                            }}
+                                                        />
+                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-blue-300 font-bold uppercase">Km</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <p className="text-[9px] font-bold text-slate-400 italic mt-2">* Estos kilómetros se sumarán a los base ({selected.activeConceptsCount.comp_km} x {profile.kmCount}km)</p>
+                                        </section>
+                                    )}
+
+                                    {/* SECCIÓN OTROS CONCEPTOS */}
+                                    {(selected.activeConceptsCount?.otros > 0) && (
+                                        <section className="bg-indigo-50/50 p-6 rounded-[32px] border-2 border-indigo-100 space-y-4 animate-in">
+                                            <label className="text-[10px] font-black uppercase text-indigo-600 block mb-2 tracking-widest flex items-center gap-2"><Icon name="edit-3" size={14}/> Detalle Conceptos "Otros"</label>
+                                            {(selected.manualEntries || []).map((entry, idx) => (
+                                                <div key={idx} className="flex gap-3 items-center">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Concepto (ej. Plus Pantalla)" 
+                                                        className="flex-1 bg-white p-3 rounded-xl border border-indigo-100 text-xs font-bold outline-none focus:border-indigo-400"
+                                                        value={entry.label}
+                                                        onChange={e => {
+                                                            const newEntries = [...selected.manualEntries];
+                                                            newEntries[idx].label = e.target.value;
+                                                            const upd = {...selected, manualEntries: newEntries};
+                                                            setSelected(upd);
+                                                            const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts');
+                                                        }}
+                                                    />
+                                                    <div className="relative w-28">
+                                                        <input 
+                                                            type="number" 
+                                                            placeholder="€" 
+                                                            className="w-full bg-white p-3 rounded-xl border border-indigo-100 text-xs font-black outline-none focus:border-indigo-400 text-right pr-6"
+                                                            value={entry.value || ''}
+                                                            onChange={e => {
+                                                                const newEntries = [...selected.manualEntries];
+                                                                newEntries[idx].value = parseFloat(e.target.value) || 0;
+                                                                const upd = {...selected, manualEntries: newEntries};
+                                                                setSelected(upd);
+                                                                const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts');
+                                                            }}
+                                                        />
+                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-300 font-bold">€</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </section>
+                                    )}
+
                                     <section className="space-y-6"><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Extras (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200 transition-all" value={selected.extras || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, extras: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div><div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Noche (H)</label><input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200 transition-all" value={selected.horasNocturnas || 0} onChange={e => { const v = parseFloat(e.target.value) || 0; const upd = {...selected, horasNocturnas: v}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} /></div></div>
                                     {(parseFloat(selected.extras) > 0) && (<div className="bg-indigo-50 p-6 rounded-[32px] border-2 border-indigo-100 animate-in"><label className="text-[10px] font-black uppercase text-indigo-600 block mb-4 tracking-widest">Compensación HE</label><div className="grid grid-cols-2 gap-2"><button onClick={() => { const upd = {...selected, extraCompMode: 'money'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode !== 'rest_total' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Pago</button><button onClick={() => { const upd = {...selected, extraCompMode: 'rest_total'}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[9px] uppercase transition-all ${selected.extraCompMode === 'rest_total' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}>Descanso</button></div></div>)}
                                     </section>
