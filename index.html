@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANAV ShiftExpert v8.9 - Optimización Técnica</title>
+    <title>ANAV ShiftExpert v9.1 - Encabezado Balances</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -145,7 +145,6 @@
                     setUser(u); 
                     setLoading(false); 
                     if (!u) {
-                        // Limpieza de estados al cerrar sesión
                         setShifts({});
                         setProfile({ group: "G V", level: "7", kmCount: 46 });
                     }
@@ -178,17 +177,17 @@
                 const isF = isSunday || d.getDay() === 6 || data.isFestive;
                 const isFriday = d.getDay() === 5;
                 const res = { total: 0, restHours: 0, items: [] };
-                const add = (label, val, type) => {
+                const add = (label, val, type, qty = 1) => {
                     const v = parseFloat(val) || 0;
-                    if (v > 0) { res.total += v; res.items.push({ label, value: v, type }); }
+                    if (v > 0) { res.total += v; res.items.push({ label, value: v, type, qty }); }
                 };
 
                 if (isSunday && data.shift && data.shift !== 'D') {
                     res.restHours += 8;
-                    res.items.push({ label: "Descanso Domingo", value: 8, type: 'coffee' });
+                    res.items.push({ label: "Descanso Domingo", value: 8, type: 'coffee', qty: 8 });
                 }
 
-                if (data.isReten) add(`Retén ${isF ? 'F' : 'L'}`, isF ? rates.r_f : rates.r_l, 'shield');
+                if (data.isReten) add(`Retén ${isF ? 'F' : 'L'}`, isF ? rates.r_f : rates.r_l, 'shield', 1);
                 
                 const concepts = data.activeConceptsCount || {};
                 Object.entries(concepts).forEach(([id, count]) => {
@@ -199,29 +198,29 @@
 
                     if (id === 'trc') {
                         const m = data.shift === 'R7' ? 1.5 : data.shift === 'R9' ? 2.5 : ['S3', 'S5'].includes(data.shift) ? (isF ? 3 : 2) : ['S1'].includes(data.shift) ? (isF ? 2 : 1) : 1;
-                        add(`Plus TRC ${m}x (x${count})`, (globalRates.TRC * m) * count, 'trc');
+                        add(`Plus TRC ${m}x (x${count})`, (globalRates.TRC * m) * count, 'trc', count);
                     }
-                    if (id === 'tra') add(`Plus TRA ${isF ? 3 : 2}x (x${count})`, (globalRates.TRA * (isF ? 3 : 2)) * count, 'tra');
-                    if (id === 'plus_llamada') add(`Plus Llamada (x${count})`, rates.call * count, 'phone');
-                    if (id === 'comp_llamada' && !data.isReten) add(`Comp. Llamada (x${count})`, (isF ? globalRates.CALL_F : globalRates.CALL_L) * count, 'phone');
-                    if (id === 'comida') add(`Ayuda Comida (x${count})`, globalRates.FOOD * count, 'food');
+                    if (id === 'tra') add(`Plus TRA ${isF ? 3 : 2}x (x${count})`, (globalRates.TRA * (isF ? 3 : 2)) * count, 'tra', count);
+                    if (id === 'plus_llamada') add(`Plus Llamada (x${count})`, rates.call * count, 'phone', count);
+                    if (id === 'comp_llamada' && !data.isReten) add(`Comp. Llamada (x${count})`, (isF ? globalRates.CALL_F : globalRates.CALL_L) * count, 'phone', count);
+                    if (id === 'comida') add(`Ayuda Comida (x${count})`, globalRates.FOOD * count, 'food', count);
                     if (id === 'comp_km') {
                         const manualKm = (data.mileageEntries || []).reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
                         const baseKm = count * (profile.kmCount || 0);
                         const totalKm = baseKm + manualKm;
-                        if (totalKm > 0) add(`Kilometraje (${totalKm}km)`, totalKm * globalRates.KM_PRICE, 'map');
+                        if (totalKm > 0) add(`Kilometraje (${totalKm}km)`, totalKm * globalRates.KM_PRICE, 'map', totalKm);
                     }
                 });
 
                 if (data.manualEntries && data.manualEntries.length > 0) {
                     data.manualEntries.forEach(entry => {
-                        if (entry.value > 0) add(entry.label || 'Otro Concepto', entry.value, 'custom');
+                        if (entry.value > 0) add(entry.label || 'Otro Concepto', entry.value, 'custom', 1);
                     });
                 }
 
                 if (data.shift === 'P1') {
                     const p1Val = isFriday ? globalRates.P1_FRI : globalRates.P1_BASE;
-                    add(`Plus P1 ${isFriday ? '(Viernes)' : ''}`, p1Val, 'p1_bonus');
+                    add(`Plus P1 ${isFriday ? '(Viernes)' : ''}`, p1Val, 'p1_bonus', 1);
                 }
 
                 if (data.shift && data.shift !== 'D') {
@@ -232,46 +231,48 @@
                         
                         if (compMode === 'mixed') {
                             res.restHours += h * 1;
-                            res.items.push({ label: `Descanso HE (1x)`, value: h * 1, type: 'coffee' });
-                            add(`HE Parte Pago (0.75x)`, h * rates.extra * 0.75, 'clock');
+                            res.items.push({ label: `Descanso HE (1x)`, value: h * 1, type: 'coffee', qty: h });
+                            add(`HE Parte Pago (0.75x)`, h * rates.extra * 0.75, 'clock', h);
                         } else if (isNightOrFestive) {
                             if (compMode === 'rest_total') {
                                 res.restHours += h * 2;
-                                res.items.push({ label: `Descanso HE (2x)`, value: h * 2, type: 'coffee' });
+                                res.items.push({ label: `Descanso HE (2x)`, value: h * 2, type: 'coffee', qty: h * 2 });
                             }
-                            else add(`Horas Extra (2.0)`, h * rates.extra, 'clock');
+                            else add(`Horas Extra (2.0)`, h * rates.extra, 'clock', h);
                         } else {
                             if (compMode === 'rest_total') {
                                 res.restHours += h * 1.75;
-                                res.items.push({ label: `Descanso HE (1.75x)`, value: h * 1.75, type: 'coffee' });
+                                res.items.push({ label: `Descanso HE (1.75x)`, value: h * 1.75, type: 'coffee', qty: h * 1.75 });
                             }
-                            else add(`Horas Extra (Laboral)`, h * rates.extra, 'clock');
+                            else add(`Horas Extra (Laboral)`, h * rates.extra, 'clock', h);
                         }
                     }
                     const n = parseFloat(data.horasNocturnas) || 0;
-                    if (n > 0) add(`Nocturnidad ${n}h`, n * rates.night, 'moon');
+                    if (n > 0) add(`Nocturnidad ${n}h`, n * rates.night, 'moon', n);
                 }
                 return res;
             }, [rates, globalRates, profile.kmCount]);
 
             const stats = useMemo(() => {
-                const s = { month: { total: 0, trc: 0, tra: 0, call: 0, food: 0, km: 0, he: 0, night: 0, reten: 0, restHours: 0, custom: 0, p1: 0 } };
+                const init = () => ({ val: 0, count: 0 });
+                const s = { 
+                    month: { 
+                        total: 0, 
+                        trc: init(), tra: init(), call: init(), food: init(), 
+                        km: init(), he: init(), night: init(), reten: init(), 
+                        restHours: 0, custom: init(), p1: init() 
+                    } 
+                };
                 Object.entries(shifts).forEach(([ds, data]) => {
                     const c = calcDay(ds, data);
                     const [y, m] = ds.split('-').map(Number);
                     if (y === viewDate.getFullYear() && m === (viewDate.getMonth() + 1)) {
                         s.month.total += c.total; s.month.restHours += c.restHours;
                         c.items.forEach(i => {
-                            if (i.type === 'trc') s.month.trc += i.value;
-                            else if (i.type === 'tra') s.month.tra += i.value;
-                            else if (i.type === 'phone') s.month.call += i.value;
-                            else if (i.type === 'food') s.month.food += i.value;
-                            else if (i.type === 'map') s.month.km += i.value;
-                            else if (i.type === 'clock') s.month.he += i.value;
-                            else if (i.type === 'moon') s.month.night += i.value;
-                            else if (i.type === 'shield') s.month.reten += i.value;
-                            else if (i.type === 'p1_bonus') s.month.p1 += i.value;
-                            else if (i.type === 'custom') s.month.custom += i.value;
+                            if (s.month[i.type]) {
+                                s.month[i.type].val += i.value;
+                                s.month[i.type].count += (i.qty || 1);
+                            }
                         });
                     }
                 });
@@ -377,20 +378,19 @@
 
             return (
                 <div className="min-h-screen bg-slate-50 pb-20">
-                    {/* BARRA DE USUARIO SUPERIOR (GLOBAL) */}
                     <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md">
                         <div className="flex items-center gap-2">
                             <Icon name="user" size={12} className="text-indigo-500" />
                             <span className="text-white">Sesión activa: {user.email}</span>
                         </div>
-                        <div className="hidden md:block italic opacity-50">ANAV ShiftExpert v8.9</div>
+                        <div className="hidden md:block italic opacity-50">ANAV ShiftExpert v9.1</div>
                     </div>
 
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="flex items-center gap-5">
                                 <div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div>
-                                <div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v8.9</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Calculadora de Jornada</p></div>
+                                <div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v9.1</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Calculadora de Jornada</p></div>
                             </div>
                             <div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden">
                                 {['calendar', 'stats', 'precios'].map(t => (
@@ -462,11 +462,11 @@
                                             {[
                                                 { l: 'Bruto Variable', v: stats.month.total, s: '€', c: 'text-2xl font-black text-slate-900' },
                                                 { l: 'Descanso Acumulado', v: stats.month.restHours, s: 'h', c: 'text-xl font-black text-indigo-600' },
-                                                { l: 'Horas Extra (Pago)', v: stats.month.he, s: '€' },
-                                                { l: 'Plus TRC', v: stats.month.trc, s: '€' },
-                                                { l: 'Plus TRA', v: stats.month.tra, s: '€' },
-                                                { l: 'Llamadas/Comp.', v: stats.month.call, s: '€' },
-                                                { l: 'Otros Conceptos', v: stats.month.custom, s: '€' }
+                                                { l: 'Horas Extra (Pago)', v: stats.month.he.val, s: '€' },
+                                                { l: 'Plus TRC', v: stats.month.trc.val, s: '€' },
+                                                { l: 'Plus TRA', v: stats.month.tra.val, s: '€' },
+                                                { l: 'Llamadas/Comp.', v: stats.month.call.val, s: '€' },
+                                                { l: 'Otros Conceptos', v: stats.month.custom.val, s: '€' }
                                             ].map(i => i.v > 0 || i.l === 'Bruto Variable' ? (
                                                 <div key={i.l} className="flex flex-col">
                                                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{i.l}</span>
@@ -495,6 +495,14 @@
 
                         {ui.tab === 'stats' && (
                             <div className="animate-in grid grid-cols-1 gap-12 p-6 md:p-12 bg-white shadow-2xl rounded-[60px] border border-slate-100">
+                                {/* ENCABEZADO DE BALANCES CON MES Y AÑO */}
+                                <div className="flex flex-col items-center justify-center gap-2 border-b border-slate-50 pb-8">
+                                    <h2 className="text-[10px] font-black uppercase text-indigo-500 tracking-[0.4em]">Balance Detallado</h2>
+                                    <h3 className="text-2xl font-black text-slate-800 capitalize tracking-tight">
+                                        {viewDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                                    </h3>
+                                </div>
+
                                 <div className="flex flex-col md:flex-row justify-between gap-10">
                                     <div className="w-full max-w-md">
                                         <div className="flex justify-between items-center mb-10">
@@ -504,39 +512,42 @@
                                         <div className="flex flex-col items-center gap-8">
                                             <div className="w-64 h-64 relative">
                                                 <PieChart data={[
-                                                    { label: 'TRC', value: stats.month.trc, color: '#6366f1' }, 
-                                                    { label: 'TRA', value: stats.month.tra, color: '#f59e0b' },
-                                                    { label: 'Llamada', value: stats.month.call, color: '#ef4444' }, 
-                                                    { label: 'Food', value: stats.month.food, color: '#10b981' },
-                                                    { label: 'KM', value: stats.month.km, color: '#0ea5e9' }, 
-                                                    { label: 'H. Extras', value: stats.month.he, color: '#8b5cf6' },
-                                                    { label: 'Nocturna', value: stats.month.night, color: '#334155' }, 
-                                                    { label: 'Retén', value: stats.month.reten, color: '#4f46e5' },
-                                                    { label: 'Plus P1', value: stats.month.p1, color: '#94a3b8' },
-                                                    { label: 'Otros', value: stats.month.custom, color: '#cbd5e1' }
+                                                    { label: 'TRC', value: stats.month.trc.val, color: '#6366f1' }, 
+                                                    { label: 'TRA', value: stats.month.tra.val, color: '#f59e0b' },
+                                                    { label: 'Llamada', value: stats.month.call.val, color: '#ef4444' }, 
+                                                    { label: 'Food', value: stats.month.food.val, color: '#10b981' },
+                                                    { label: 'KM', value: stats.month.km.val, color: '#0ea5e9' }, 
+                                                    { label: 'H. Extras', value: stats.month.he.val, color: '#8b5cf6' },
+                                                    { label: 'Nocturna', value: stats.month.night.val, color: '#334155' }, 
+                                                    { label: 'Retén', value: stats.month.reten.val, color: '#4f46e5' },
+                                                    { label: 'Plus P1', value: stats.month.p1.val, color: '#94a3b8' },
+                                                    { label: 'Otros', value: stats.month.custom.val, color: '#cbd5e1' }
                                                 ]} />
                                             </div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6 w-full self-center">
                                         {[
-                                            { label: 'Plus TRC', value: stats.month.trc, color: '#6366f1' }, 
-                                            { label: 'Plus TRA', value: stats.month.tra, color: '#f59e0b' },
-                                            { label: 'Llamadas/Comp.', value: stats.month.call, color: '#ef4444' }, 
-                                            { label: 'Ayuda Comida', value: stats.month.food, color: '#10b981' },
-                                            { label: 'Kilometraje', value: stats.month.km, color: '#0ea5e9' }, 
-                                            { label: 'Horas Extras', value: stats.month.he, color: '#8b5cf6' },
-                                            { label: 'Nocturnidad', value: stats.month.night, color: '#334155' }, 
-                                            { label: 'Retén Total', value: stats.month.reten, color: '#4f46e5' },
-                                            { label: 'Plus P1', value: stats.month.p1, color: '#94a3b8' },
-                                            { label: 'Otros Conceptos', value: stats.month.custom, color: '#cbd5e1' }
+                                            { label: 'Plus TRC', data: stats.month.trc, color: '#6366f1' }, 
+                                            { label: 'Plus TRA', data: stats.month.tra, color: '#f59e0b' },
+                                            { label: 'Llamadas/Comp.', data: stats.month.call, color: '#ef4444' }, 
+                                            { label: 'Ayuda Comida', data: stats.month.food, color: '#10b981' },
+                                            { label: 'Kilometraje', data: stats.month.km, color: '#0ea5e9', unit: 'km' }, 
+                                            { label: 'Horas Extras', data: stats.month.he, color: '#8b5cf6', unit: 'h' },
+                                            { label: 'Nocturnidad', data: stats.month.night, color: '#334155', unit: 'h' }, 
+                                            { label: 'Retén Total', data: stats.month.reten, color: '#4f46e5' },
+                                            { label: 'Plus P1', data: stats.month.p1, color: '#94a3b8' },
+                                            { label: 'Otros Conceptos', data: stats.month.custom, color: '#cbd5e1' }
                                         ].map((i, idx) => (
-                                            <div key={idx} className={`flex items-center justify-between p-4 rounded-3xl bg-slate-50 border border-slate-100 ${i.value > 0 ? 'opacity-100' : 'opacity-40 grayscale'}`}>
+                                            <div key={idx} className={`flex items-center justify-between p-4 rounded-3xl bg-slate-50 border border-slate-100 ${i.data.val > 0 ? 'opacity-100' : 'opacity-40 grayscale'}`}>
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-4 h-4 rounded-full shadow-inner" style={{ backgroundColor: i.color }}></div>
                                                     <span className="text-[11px] font-black uppercase text-slate-500 tracking-tight">{i.label}</span>
                                                 </div>
-                                                <span className="text-sm font-black text-slate-900">{i.value.toLocaleString('es-ES', { minimumFractionDigits: 1 })}€</span>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-[10px] font-bold text-indigo-400 bg-indigo-50/50 px-2 py-0.5 rounded-lg">(x{i.data.count.toLocaleString('es-ES', { maximumFractionDigits: 1 })}{i.unit || ''})</span>
+                                                    <span className="text-sm font-black text-slate-900">{i.data.val.toLocaleString('es-ES', { minimumFractionDigits: 1 })}€</span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -705,7 +716,7 @@
                                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Noche (H)</label>
                                                 <input type="number" step="0.5" className="w-full bg-slate-50 p-5 rounded-2xl border-2 border-slate-100 text-3xl font-black text-slate-800 outline-none focus:border-indigo-200 transition-all" value={selected.horasNocturnas || 0} onChange={e => { 
                                                     const v = parseFloat(e.target.value) || 0; 
-                                                    const upd = {...selected, horasNocturnas: v}; // Corregido: antes apuntaba a extras
+                                                    const upd = {...selected, horasNocturnas: v}; 
                                                     setSelected(upd); 
                                                     const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); 
                                                 }} />
