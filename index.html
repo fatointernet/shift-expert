@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ANAV ShiftExpert v15.0 - Ajuste TRC S1/S3</title>
+    <title>ANAV ShiftExpert v16.0 - Sumatorio TRC Real</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -186,7 +186,8 @@
                         else if (['S1', 'S3'].includes(data.shift)) m = isF ? 2 : 1;
                         else m = 1;
 
-                        add(`Plus TRC ${m}x (x${count})`, (globalRates.TRC * m) * count, 'trc', count);
+                        // Se cambia el último parámetro de count a m * count para que el sumatorio en el balance sea de unidades reales de TRC
+                        add(`Plus TRC ${m}x (x${count})`, (globalRates.TRC * m) * count, 'trc', m * count);
                     }
                     if (id === 'tra') add(`Plus TRA ${isF ? 3 : 2}x (x${count})`, (globalRates.TRA * (isF ? 3 : 2)) * count, 'tra', count);
                     if (id === 'plus_llamada') add(`Plus Llamada (x${count})`, rates.call * count, 'call_plus', count);
@@ -296,14 +297,14 @@
                 <div className="min-h-screen bg-slate-50 pb-20">
                     <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md">
                         <div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">Sesión activa: {user.email}</span></div>
-                        <div className="hidden md:block italic opacity-50">ANAV ShiftExpert v15.0</div>
+                        <div className="hidden md:block italic opacity-50">ANAV ShiftExpert v16.0</div>
                     </div>
 
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="flex items-center gap-5">
                                 <div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div>
-                                <div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v15.0</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Calculadora de Jornada</p></div>
+                                <div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v16.0</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Calculadora de Jornada</p></div>
                             </div>
                             <div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden items-center">
                                 <button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>
