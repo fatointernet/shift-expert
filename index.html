@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShiftExpert - Control Horario</title>
+    <title>ShiftExpert v21.5 - Control Horario</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -279,7 +279,6 @@
                     if (!current.base && !current.concept) delete newPlan[ds]; else newPlan[ds] = current;
                     setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
                 } else {
-                    // MODIFICACIÓN: Si es el concepto FESTIVO estático, aplicar directamente sin modal
                     if (tool.id === 'static_festivo') {
                         applyConcept(ds, tool.id);
                     } else {
@@ -654,9 +653,9 @@
 
             return (
                 <div className="min-h-screen bg-slate-50 pb-20">
-                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">Sesión activa: {user?.email}</span></div><div className="hidden md:block italic opacity-50">ANAV ShiftExpert v21.5</div></div>
+                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">Sesión activa: {user?.email}</span></div><div className="hidden md:block italic opacity-50">ShiftExpert v21.5</div></div>
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v21.5</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Festivo Instantáneo</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400 hover:text-indigo-600"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400 hover:text-red-600"><Icon name="log-out" size={18}/></button></div></div>
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v21.5</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Control Horario</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400 hover:text-indigo-600"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400 hover:text-red-600"><Icon name="log-out" size={18}/></button></div></div>
                         
                         {ui.tab === 'calendar' && (
                             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in">
