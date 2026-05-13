@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShiftExpert v19.9 - Corrección y Estabilidad</title>
+    <title>ShiftExpert v21.5 - Festivo Instantáneo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -92,28 +92,26 @@
 
         const PLANNER_TOOLS = [
             { id: 'intensiva', label: 'J. Intensiva / TRA (7:30h)', color: 'bg-yellow-400', textColor: 'text-black', isBase: true },
-            { id: 'partida', label: 'J. Partida (8:30h)', color: 'bg-slate-300', textColor: 'text-slate-800', isBase: true },
-            { id: 'fiesta_oficial', label: 'Fiesta Oficial', color: 'bg-red-500', textColor: 'text-white' },
-            { id: 'art_43_46', label: 'Art. 43/46', color: 'bg-orange-400', textColor: 'text-white' },
-            { id: 'fiesta_local', label: 'Fiesta Local', color: 'bg-pink-400', textColor: 'text-white' },
-            { id: 'compensar', label: 'H. a Compensar', color: 'bg-blue-300', textColor: 'text-blue-900' },
-            { id: 'ausencia', label: 'Ausencias', color: 'bg-gray-400', textColor: 'text-white' },
-            { id: 'baja', label: 'Baja', color: 'bg-red-200', textColor: 'text-red-800' },
-            { id: 'reten', label: 'Retén', color: 'bg-indigo-600', textColor: 'text-white' },
+            { id: 'partida', label: 'J. Partida (8:30h)', color: 'bg-slate-300', textColor: 'text-slate-800', isBase: true }
+        ];
+
+        const STATIC_CONCEPTS = [
+            { id: 'static_festivo', label: 'FESTIVO', color: 'bg-red-600', textColor: 'text-white', isStatic: true }
         ];
 
         const DEFAULT_PLANNER_COUNTERS = [
-            { id: 1, desc: "ADEQUACIÓ JORNADA TRIENNAL", val: "28:30" },
-            { id: 2, desc: "ARTICULO 73", val: "12:00" },
-            { id: 3, desc: "BOLSA CONTROL HORARIO", val: "19:56" },
-            { id: 4, desc: "COMP. DIAS BCH", val: "5,00" },
-            { id: 5, desc: "HORAS A COMPENSAR 2024", val: "54:49" },
-            { id: 6, desc: "HORAS A COMPENSAR 2025", val: "111:41" },
-            { id: 7, desc: "HORAS A COMPENSAR 2026", val: "0:00" },
-            { id: 8, desc: "HORAS A COMPENSAR HISTORICO", val: "112:22" },
-            { id: 9, desc: "MATERNIDAD / PATERNIDAD", val: "0,00" },
-            { id: 10, desc: "VACANCES ANY ACTUAL", val: "156:30" },
-            { id: 11, desc: "VACANCES ANY ANTERIOR", val: "0:00" }
+            { id: 1, desc: "ART. 43/46", val: "0:00" },
+            { id: 2, desc: "AUSENCIAS", val: "0:00" },
+            { id: 3, desc: "BAJA", val: "0:00" },
+            { id: 4, desc: "RETÉN", val: "0:00" },
+            { id: 5, desc: "ADEQUACIÓ JORNADA TRIENNAL", val: "28:30" },
+            { id: 6, desc: "ARTICULO 73", val: "12:00" },
+            { id: 7, desc: "BOLSA CONTROL HORARIO", val: "19:56" },
+            { id: 8, desc: "COMP. DIAS BCH", val: "5,00" },
+            { id: 9, desc: "HORAS A COMPENSAR 2024", val: "54:49" },
+            { id: 10, desc: "HORAS A COMPENSAR 2025", val: "111:41" },
+            { id: 11, desc: "HORAS A COMPENSAR HISTORICO", val: "112:22" },
+            { id: 12, desc: "VACANCES ANY ACTUAL", val: "156:30" }
         ];
 
         const DYNAMIC_PLANNER_COLORS = [
@@ -195,15 +193,38 @@
             );
         };
 
-        const PlannerView = ({ viewDate, setViewDate, annualPlan, setAnnualPlan, plannerCounters, setPlannerCounters, userColors, setUserColors, counterUsage, save, ui, setUi, activeTool, setActiveTool }) => {
+        const PlannerView = ({ viewDate, setViewDate, annualPlan, setAnnualPlan, plannerCounters, setPlannerCounters, userColors, setUserColors, counterUsage, save, ui, setUi, activeTool, setActiveTool, weeklyRotation, setWeeklyRotation, shifts, setShifts }) => {
             const year = viewDate.getFullYear();
             const months = Array.from({ length: 12 }, (_, i) => i);
             const [toolActionModal, setToolActionModal] = useState(null);
 
             const combinedTools = useMemo(() => {
-                const counterTools = plannerCounters.map((c, idx) => ({ id: `cnt_${c.id}`, label: c.desc, color: DYNAMIC_PLANNER_COLORS[idx % DYNAMIC_PLANNER_COLORS.length].bg, textColor: DYNAMIC_PLANNER_COLORS[idx % DYNAMIC_PLANNER_COLORS.length].text, isBase: false }));
-                return [...PLANNER_TOOLS, ...counterTools].map(t => ({ ...t, customColor: userColors[t.id] || null }));
+                const staticConceptTools = STATIC_CONCEPTS.map(c => ({
+                    id: c.id,
+                    label: c.label,
+                    color: c.color,
+                    textColor: c.textColor,
+                    isBase: false,
+                    isStatic: true
+                }));
+                const counterTools = plannerCounters.map((c, idx) => ({ 
+                    id: `cnt_${c.id}`, 
+                    rawId: c.id,
+                    label: c.desc, 
+                    color: DYNAMIC_PLANNER_COLORS[idx % DYNAMIC_PLANNER_COLORS.length].bg, 
+                    textColor: DYNAMIC_PLANNER_COLORS[idx % DYNAMIC_PLANNER_COLORS.length].text, 
+                    isBase: false,
+                    isCustom: true
+                }));
+                return [...PLANNER_TOOLS, ...staticConceptTools, ...counterTools].map(t => ({ ...t, customColor: userColors[t.id] || null }));
             }, [plannerCounters, userColors]);
+
+            const deleteCounter = (id) => {
+                const n = plannerCounters.filter(c => c.id !== id);
+                setPlannerCounters(n); 
+                save(n, 'planner_counters');
+                if (activeTool === `cnt_${id}`) setActiveTool(null);
+            };
 
             const changeYear = (delta) => {
                 const newDate = new Date(viewDate);
@@ -217,18 +238,21 @@
                 setUi({ ...ui, colorPicker: { id: toolId, x: rect.right + 12, y: rect.top } });
             };
 
-            const togglePlanDay = (ds) => {
-                if (!activeTool) return;
-                const tool = combinedTools.find(t => t.id === activeTool);
-                if (!tool) return;
-                if (tool.isBase) {
-                    const newPlan = { ...annualPlan };
-                    let current = typeof newPlan[ds] === 'object' ? { ...newPlan[ds] } : { base: (newPlan[ds] === 'intensiva' || newPlan[ds] === 'partida' ? newPlan[ds] : null), concept: (newPlan[ds] && newPlan[ds] !== 'intensiva' && newPlan[ds] !== 'partida' ? newPlan[ds] : null) };
-                    current.base = current.base === activeTool ? null : activeTool;
-                    if (!current.base && !current.concept) delete newPlan[ds]; else newPlan[ds] = current;
-                    setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
-                } else {
-                    setToolActionModal({ ds, toolId: tool.id, toolLabel: tool.label });
+            const toggleRotation = (year, month, weekIdx) => {
+                const key = `${year}-${month}-${weekIdx}`;
+                const current = weeklyRotation[key];
+                const next = current === 'M' ? 'T' : current === 'T' ? null : 'M';
+                const nr = { ...weeklyRotation, [key]: next };
+                setWeeklyRotation(nr);
+                save(nr, 'weekly_rotation');
+            };
+
+            const syncFestive = (ds, toolId) => {
+                const tool = combinedTools.find(t => t.id === toolId);
+                if (tool && (tool.label.toUpperCase().includes("FIESTA") || tool.label.toUpperCase().includes("FESTIVO"))) {
+                    const ns = { ...shifts, [ds]: { ...shifts[ds], isFestive: true } };
+                    setShifts(ns);
+                    save(ns, 'shifts');
                 }
             };
 
@@ -240,7 +264,28 @@
                 else delete current.manualHours;
                 if (!current.base && !current.concept) delete newPlan[ds]; else newPlan[ds] = current;
                 setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
+                syncFestive(ds, toolId);
                 setToolActionModal(null);
+            };
+
+            const togglePlanDay = (ds) => {
+                if (!activeTool) return;
+                const tool = combinedTools.find(t => t.id === activeTool);
+                if (!tool) return;
+                if (tool.isBase) {
+                    const newPlan = { ...annualPlan };
+                    let current = typeof newPlan[ds] === 'object' ? { ...newPlan[ds] } : { base: (newPlan[ds] === 'intensiva' || newPlan[ds] === 'partida' ? newPlan[ds] : null), concept: (newPlan[ds] && newPlan[ds] !== 'intensiva' && newPlan[ds] !== 'partida' ? newPlan[ds] : null) };
+                    current.base = current.base === activeTool ? null : activeTool;
+                    if (!current.base && !current.concept) delete newPlan[ds]; else newPlan[ds] = current;
+                    setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
+                } else {
+                    // MODIFICACIÓN: Si es el concepto FESTIVO estático, aplicar directamente sin modal
+                    if (tool.id === 'static_festivo') {
+                        applyConcept(ds, tool.id);
+                    } else {
+                        setToolActionModal({ ds, toolId: tool.id, toolLabel: tool.label });
+                    }
+                }
             };
 
             const resetDay = (ds) => {
@@ -252,11 +297,6 @@
 
             const updateCounter = (id, field, val) => {
                 const n = plannerCounters.map(c => c.id === id ? { ...c, [field]: val } : c);
-                setPlannerCounters(n); save(n, 'planner_counters');
-            };
-
-            const deleteCounter = (id) => {
-                const n = plannerCounters.filter(c => c.id !== id);
                 setPlannerCounters(n); save(n, 'planner_counters');
             };
 
@@ -272,7 +312,7 @@
                 };
                 return (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in">
-                        <div className="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden border border-slate-100">
+                        <div className="bg-white w-full max-sm rounded-[40px] shadow-2xl overflow-hidden border border-slate-100">
                             <div className="bg-slate-900 p-8 text-white">
                                 <div className="flex justify-between items-start mb-2">
                                     <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Configuración de Imputación</p>
@@ -340,7 +380,18 @@
                                     </div>
                                     <p className="text-[8px] font-black text-slate-300 uppercase mb-2">Conceptos / Bolsas</p>
                                     {combinedTools.filter(t => !t.isBase).map(tool => (
-                                        <button key={tool.id} onClick={() => setActiveTool(activeTool === tool.id ? null : tool.id)} className={`w-full text-left p-3 rounded-2xl text-[9px] font-black uppercase transition-all border-2 flex items-center justify-between ${activeTool === tool.id ? 'border-indigo-600 bg-indigo-50 shadow-md ring-4 ring-indigo-50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}><span className="truncate pr-2">{tool.label}</span><div onClick={(e) => handleColorClick(e, tool.id)} className={`w-5 h-5 rounded-full shrink-0 border border-black/5 shadow-sm cursor-crosshair hover:scale-125 transition-transform ${tool.customColor ? '' : tool.color}`} style={tool.customColor ? { backgroundColor: tool.customColor } : {}}></div></button>
+                                        <div key={tool.id} className="relative group">
+                                            <button onClick={() => setActiveTool(activeTool === tool.id ? null : tool.id)} className={`w-full text-left p-3 rounded-2xl text-[9px] font-black uppercase transition-all border-2 flex items-center justify-between ${activeTool === tool.id ? 'border-indigo-600 bg-indigo-50 shadow-md ring-4 ring-indigo-50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+                                                <span className="truncate pr-8">{tool.label}</span>
+                                                <div onClick={(e) => handleColorClick(e, tool.id)} className={`w-5 h-5 rounded-full shrink-0 border border-black/5 shadow-sm cursor-crosshair hover:scale-125 transition-transform ${tool.customColor ? '' : tool.color}`} style={tool.customColor ? { backgroundColor: tool.customColor } : {}}></div>
+                                            </button>
+                                            {tool.isCustom && (
+                                                <button onClick={(e) => { e.stopPropagation(); deleteCounter(tool.rawId); }} className="absolute right-10 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Icon name="trash-2" size={12} /></button>
+                                            )}
+                                            {tool.isStatic && (
+                                                <div className="absolute right-10 top-1/2 -translate-y-1/2 p-1.5 text-slate-200" title="Concepto Fijo"><Icon name="lock" size={12} /></div>
+                                            )}
+                                        </div>
                                     ))}
                                     <button onClick={() => setActiveTool(null)} className="w-full mt-4 text-center py-3 text-[10px] font-black text-red-500 uppercase tracking-widest border-t border-slate-50 hover:bg-red-50 rounded-b-2xl">Limpiar Selección</button>
                                 </div>
@@ -352,17 +403,33 @@
                                 return (
                                     <div key={m} className="bg-white p-6 rounded-[32px] shadow-lg border border-slate-100 flex flex-col">
                                         <h5 className="text-xs font-black uppercase text-slate-800 mb-4 text-center tracking-[0.2em]">{mName}</h5>
-                                        <div className="grid grid-cols-7 gap-1">
+                                        <div className="grid grid-cols-[2rem_repeat(7,1fr)] gap-1">
+                                            <div className="text-[8px] font-black text-slate-200 text-center py-1"></div>
                                             {['L','M','X','J','V','S','D'].map(d => <div key={d} className="text-[8px] font-black text-slate-300 text-center py-1">{d}</div>)}
-                                            {Array.from({ length: fD }).map((_, i) => <div key={`e-${i}`}></div>)}
-                                            {Array.from({ length: dInM }).map((_, i) => {
-                                                const d = i + 1, ds = toISO(new Date(year, m, d)), p = annualPlan[ds];
-                                                const bId = typeof p === 'object' ? p.base : (p === 'intensiva' || p === 'partida' ? p : null);
-                                                const cId = typeof p === 'object' ? p.concept : (p && p !== 'intensiva' && p !== 'partida' ? p : null);
-                                                const tC = combinedTools.find(t => t.id === cId), tB = combinedTools.find(t => t.id === bId);
-                                                return (
-                                                    <div key={d} onClick={() => togglePlanDay(ds)} className={`planner-day h-8 flex items-center justify-center rounded-lg text-[10px] font-black cursor-pointer border shadow-sm transition-all ${tC ? (tC.customColor ? '' : tC.color) : 'bg-slate-50 text-slate-400 border-transparent hover:border-indigo-100'}`} style={tC && tC.customColor ? { backgroundColor: tC.customColor, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.2)' } : {}}>{tB && <div className="corner-base" style={{ borderLeftColor: 'transparent', borderTopColor: tB.customColor || (tB.id === 'intensiva' ? '#facc15' : '#cbd5e1') }}></div>}{d}{p?.manualHours !== undefined && <div className="absolute bottom-0 right-0 bg-white/40 px-0.5 rounded-[2px] text-[5px] font-bold text-slate-700 leading-none">{formatTimeStr(p.manualHours)}</div>}</div>
-                                                );
+                                            {Array.from({ length: 42 }).map((_, globalIdx) => {
+                                                const d = globalIdx - fD + 1;
+                                                const weekIdx = Math.floor(globalIdx / 7);
+                                                const isStartOfWeek = globalIdx % 7 === 0;
+                                                const key = `${year}-${m}-${weekIdx}`;
+                                                const rot = weeklyRotation[key];
+
+                                                if (isStartOfWeek) {
+                                                    return (
+                                                      <React.Fragment key={`row-${weekIdx}`}>
+                                                        <button onClick={() => toggleRotation(year, m, weekIdx)} className={`h-8 flex items-center justify-center rounded-lg text-[9px] font-black border transition-all ${rot ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm' : 'bg-slate-50 text-slate-200 border-transparent hover:border-slate-200'}`}>
+                                                            {rot || '-'}
+                                                        </button>
+                                                        {d > 0 && d <= dInM ? (
+                                                            <PlannerDayCell key={d} d={d} ds={toISO(new Date(year, m, d))} annualPlan={annualPlan} combinedTools={combinedTools} togglePlanDay={togglePlanDay} />
+                                                        ) : <div key={`empty-${globalIdx}`} className="h-8"></div>}
+                                                      </React.Fragment>
+                                                    );
+                                                }
+
+                                                if (d > 0 && d <= dInM) {
+                                                    return <PlannerDayCell key={d} d={d} ds={toISO(new Date(year, m, d))} annualPlan={annualPlan} combinedTools={combinedTools} togglePlanDay={togglePlanDay} />;
+                                                }
+                                                return <div key={`empty-${globalIdx}`} className="h-8"></div>;
                                             })}
                                         </div>
                                     </div>
@@ -384,9 +451,19 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div className="mt-8 pt-8 border-t border-slate-50 flex justify-end"><button onClick={() => { const nI = plannerCounters.length > 0 ? Math.max(...plannerCounters.map(c => c.id)) + 1 : 1; const nC = [...plannerCounters, { id: nI, desc: "NUEVA BOLSA", val: "00:00" }]; setPlannerCounters(nC); save(nC, 'planner_counters'); }} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl active:scale-95"><Icon name="plus" size={14} /> Añadir Bolsa</button></div>
+                        <div className="mt-8 pt-8 border-t border-slate-50 flex justify-end"><button onClick={() => { const nI = plannerCounters.length > 0 ? Math.max(...plannerCounters.map(c => c.id)) + 1 : 1; const nC = [...plannerCounters, { id: nI, desc: "NUEVO CONCEPTO", val: "00:00" }]; setPlannerCounters(nC); save(nC, 'planner_counters'); }} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl active:scale-95"><Icon name="plus" size={14} /> Añadir Concepto</button></div>
                     </div>
                 </div>
+            );
+        };
+
+        const PlannerDayCell = ({ d, ds, annualPlan, combinedTools, togglePlanDay }) => {
+            const p = annualPlan[ds];
+            const bId = typeof p === 'object' ? p.base : (p === 'intensiva' || p === 'partida' ? p : null);
+            const cId = typeof p === 'object' ? p.concept : (p && p !== 'intensiva' && p !== 'partida' ? p : null);
+            const tC = combinedTools.find(t => t.id === cId), tB = combinedTools.find(t => t.id === bId);
+            return (
+                <div onClick={() => togglePlanDay(ds)} className={`planner-day h-8 flex items-center justify-center rounded-lg text-[10px] font-black cursor-pointer border shadow-sm transition-all ${tC ? (tC.customColor ? '' : tC.color) : 'bg-slate-50 text-slate-400 border-transparent hover:border-indigo-100'}`} style={tC && tC.customColor ? { backgroundColor: tC.customColor, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.2)' } : {}}>{tB && <div className="corner-base" style={{ borderLeftColor: 'transparent', borderTopColor: tB.customColor || (tB.id === 'intensiva' ? '#facc15' : '#cbd5e1') }}></div>}{d}{p?.manualHours !== undefined && <div className="absolute bottom-0 right-0 bg-white/40 px-0.5 rounded-[2px] text-[5px] font-bold text-slate-700 leading-none">{formatTimeStr(p.manualHours)}</div>}</div>
             );
         };
 
@@ -401,8 +478,6 @@
             );
         };
 
-        // --- MAIN APP ---
-
         const App = () => {
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -411,6 +486,7 @@
             const [annualPlan, setAnnualPlan] = useState({});
             const [userColors, setUserColors] = useState({});
             const [plannerCounters, setPlannerCounters] = useState(DEFAULT_PLANNER_COUNTERS);
+            const [weeklyRotation, setWeeklyRotation] = useState({});
             const [profile, setProfile] = useState({ group: "G V", level: "7", kmCount: 46 });
             const [globalRates, setGlobalRates] = useState(DEFAULT_GLOBAL_CONST);
             const [salaryMatrix, setSalaryMatrix] = useState(DEFAULT_SALARY_DATA);
@@ -426,7 +502,7 @@
             }, [user]);
 
             useEffect(() => {
-                const unsubAuth = onAuthStateChanged(auth, (u) => { setUser(u); setLoading(false); if (!u) { setShifts({}); setAnnualPlan({}); setPlannerCounters(DEFAULT_PLANNER_COUNTERS); setUserColors({}); setProfile({ group: "G V", level: "7", kmCount: 46 }); } });
+                const unsubAuth = onAuthStateChanged(auth, (u) => { setUser(u); setLoading(false); if (!u) { setShifts({}); setAnnualPlan({}); setPlannerCounters(DEFAULT_PLANNER_COUNTERS); setUserColors({}); setWeeklyRotation({}); setProfile({ group: "G V", level: "7", kmCount: 46 }); } });
                 return () => unsubAuth();
             }, []);
 
@@ -436,6 +512,7 @@
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'shifts'), snap => snap.exists() && setShifts(snap.data().data || {}), () => {}),
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'annual_plan'), snap => snap.exists() && setAnnualPlan(snap.data().data || {}), () => {}),
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'planner_counters'), snap => snap.exists() && setPlannerCounters(snap.data().data || DEFAULT_PLANNER_COUNTERS), () => {}),
+                    onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'weekly_rotation'), snap => snap.exists() && setWeeklyRotation(snap.data().data || {}), () => {}),
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'profile'), snap => snap.exists() && setProfile(p => ({ ...p, ...snap.data().data })), () => {}),
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'globalRates'), snap => snap.exists() && setGlobalRates(snap.data().data || DEFAULT_GLOBAL_CONST), () => {}),
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'salaryMatrix'), snap => snap.exists() && setSalaryMatrix(snap.data().data || DEFAULT_SALARY_DATA), () => {}),
@@ -453,9 +530,22 @@
 
             const calcDay = useCallback((dateStr, data, plan, allShifts) => {
                 if (!data) return { total: 0, restHours: 0, items: [] };
-                const d = new Date(dateStr), isSunday = d.getDay() === 0, isF = isSunday || d.getDay() === 6 || data.isFestive, isFriday = d.getDay() === 5;
+                const pEntry = plan?.[dateStr];
+                const conceptId = typeof pEntry === 'object' ? pEntry.concept : (pEntry && pEntry !== 'intensiva' && pEntry !== 'partida' ? pEntry : null);
+                
+                const isStaticFestive = conceptId === 'static_festivo';
+                const plannerCounter = plannerCounters.find(c => `cnt_${c.id}` === conceptId);
+                const isDynamicFestive = plannerCounter && (plannerCounter.desc.toUpperCase().includes("FIESTA") || plannerCounter.desc.toUpperCase().includes("FESTIVO"));
+                const isPlannerFestive = isStaticFestive || isDynamicFestive;
+
+                const d = new Date(dateStr);
+                const isSunday = d.getDay() === 0;
+                const isF = isSunday || d.getDay() === 6 || data.isFestive || isPlannerFestive; 
+                const isFriday = d.getDay() === 5;
+                
                 const res = { total: 0, restHours: 0, items: [] };
                 const add = (label, val, type, qty = 1) => { if (val > 0) { res.total += val; res.items.push({ label, value: val, type, qty }); } };
+                
                 if (isF && data.shift && data.shift !== 'D') {
                     const nextDay = new Date(d); nextDay.setDate(d.getDate() + 1);
                     const nextDayISO = toISO(nextDay); const nDayData = allShifts?.[nextDayISO];
@@ -466,10 +556,13 @@
                         res.restHours += restAmount; res.items.push({ label: isSunday ? `Descanso Domingo (${restAmount}h)` : `Descanso Festivo (${restAmount}h)`, value: restAmount, type: 'coffee', qty: restAmount });
                     }
                 }
+
                 if (data.isReten) add(`Retén ${isF ? 'F' : 'L'}`, isF ? rates.r_f : rates.r_l, 'reten', 1);
+                
                 const concepts = data.activeConceptsCount || {};
                 const tKm = (parseFloat(concepts['comp_km']) || 0) * (profile.kmCount || 0) + (parseFloat(data.extraKm) || 0);
                 if (tKm > 0) add(`Kilometraje (${tKm}km)`, tKm * globalRates.KM_PRICE, 'km', tKm);
+                
                 Object.entries(concepts).forEach(([id, count]) => {
                     if (count <= 0 || id === 'comp_km') return;
                     if ((data.shift === 'R7' || data.shift === 'R9') && ['plus_llamada', 'comp_llamada'].includes(id) && !isF) return;
@@ -480,7 +573,9 @@
                     if (id === 'comida') add(`Ayuda Comida (x${count})`, globalRates.FOOD * count, 'food', count);
                     if (id === 'otros' && parseFloat(data.otrosValue) > 0) add(data.otrosLabel || 'Otros', parseFloat(data.otrosValue) * count, 'custom', count);
                 });
+
                 if (data.shift === 'P1') add(`Plus P1 ${isFriday ? '(Viernes)' : ''}`, isFriday ? globalRates.P1_FRI : globalRates.P1_BASE, 'p1', 1);
+                
                 if (data.shift && data.shift !== 'D') {
                     const h = parseFloat(data.extras) || 0;
                     if (h > 0) {
@@ -492,7 +587,7 @@
                     if (parseFloat(data.horasNocturnas) > 0) add(`Nocturnidad ${data.horasNocturnas}h`, parseFloat(data.horasNocturnas) * rates.night, 'night', parseFloat(data.horasNocturnas));
                 }
                 return res;
-            }, [rates, globalRates, profile.kmCount]);
+            }, [rates, globalRates, profile.kmCount, plannerCounters]);
 
             const stats = useMemo(() => {
                 const init = () => ({ val: 0, count: 0 });
@@ -514,9 +609,11 @@
                 const usage = {};
                 Object.entries(annualPlan).forEach(([ds, plan]) => {
                     if (!plan) return;
-                    let base = typeof plan === 'object' ? plan.base : (plan === 'intensiva' || plan === 'partida' ? plan : null);
                     let conceptId = typeof plan === 'object' ? plan.concept : (plan !== 'intensiva' && plan !== 'partida' ? plan : null);
-                    if (conceptId) { usage[conceptId] = (usage[conceptId] || 0) + (plan.manualHours !== undefined ? plan.manualHours : (base === 'intensiva' ? 7.5 : base === 'partida' ? 8.5 : 8)); }
+                    let base = typeof plan === 'object' ? plan.base : (plan === 'intensiva' || plan === 'partida' ? plan : null);
+                    if (conceptId && conceptId.startsWith('cnt_')) {
+                        usage[conceptId] = (usage[conceptId] || 0) + (plan.manualHours !== undefined ? plan.manualHours : (base === 'intensiva' ? 7.5 : base === 'partida' ? 8.5 : 8));
+                    }
                 });
                 return usage;
             }, [annualPlan]);
@@ -541,7 +638,7 @@
             if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>;
             if (!user) return (
                 <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-                    <div className="bg-slate-900 w-full max-w-sm rounded-[40px] shadow-2xl p-10 border border-slate-800 animate-in">
+                    <div className="bg-slate-900 w-full max-sm rounded-[40px] shadow-2xl p-10 border border-slate-800 animate-in">
                         <div className="flex flex-col items-center mb-10"><Icon name="calendar" size={40} className="text-indigo-500 mb-4" /><h1 className="text-2xl font-black text-white uppercase tracking-tight">ShiftExpert</h1></div>
                         <form onSubmit={handleAuth} className="space-y-4">
                             <input type="email" required className="w-full bg-slate-800 p-4 rounded-2xl text-white text-sm" placeholder="Email" value={authFields.email} onChange={e => setAuthFields({...authFields, email: e.target.value})} />
@@ -557,16 +654,16 @@
 
             return (
                 <div className="min-h-screen bg-slate-50 pb-20">
-                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">Sesión activa: {user?.email}</span></div><div className="hidden md:block italic opacity-50">ANAV ShiftExpert v19.9</div></div>
+                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">Sesión activa: {user?.email}</span></div><div className="hidden md:block italic opacity-50">ANAV ShiftExpert v21.5</div></div>
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v19.9</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Estabilidad Mejorada</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400 hover:text-indigo-600"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400 hover:text-red-600"><Icon name="log-out" size={18}/></button></div></div>
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v21.5</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Festivo Instantáneo</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400 hover:text-indigo-600"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400 hover:text-red-600"><Icon name="log-out" size={18}/></button></div></div>
                         
                         {ui.tab === 'calendar' && (
                             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in">
                                 <div className="lg:col-span-3 bg-white shadow-2xl rounded-[48px] overflow-hidden border border-slate-100">
                                     <div className="flex justify-between items-center p-8 border-b border-slate-50"><button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))} className="p-4 bg-slate-50 rounded-3xl hover:bg-indigo-50 transition-all"><Icon name="chevron-left" size={24}/></button><h3 className="text-xl font-black text-slate-800 capitalize tracking-tight">{viewDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h3><button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))} className="p-4 bg-slate-50 rounded-3xl hover:bg-indigo-50 transition-all"><Icon name="chevron-right" size={24}/></button></div>
                                     <div className="grid grid-cols-7 bg-slate-900 text-white py-4 text-center text-[9px] font-black uppercase opacity-90">{['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => <div key={d} className={d === 'Sáb' || d === 'Dom' ? 'text-red-400' : ''}>{d}</div>)}</div>
-                                    <div className="grid grid-cols-7">{(() => { const y = viewDate.getFullYear(), m = viewDate.getMonth(), s = (new Date(y, m, 1).getDay() + 6) % 7, t = new Date(y, m + 1, 0).getDate(), cells = []; for(let i=0; i<s; i++) cells.push(<div key={`e-${i}`} className="h-32 md:h-52 bg-slate-50/20 border border-slate-50"></div>); for(let d=1; d<=t; d++) { const ds = toISO(new Date(y, m, d)), dt = shifts[ds], cl = calcDay(ds, dt, annualPlan, shifts), isV = (new Date(y, m, d).getDay() === 0 || new Date(y, m, d).getDay() === 6 || dt?.isFestive); cells.push(<div key={d} onClick={() => { setSelected({ day: d, ds, ...dt }); setUi({...ui, modal: true}); }} className={`h-56 md:h-64 border border-slate-100 p-3 cursor-pointer transition-all hover:bg-indigo-50 flex flex-col ${isV ? 'bg-red-50/20' : 'bg-white'}`}><div className="flex justify-between items-start mb-2"><span className={`text-[12px] font-black ${isV ? 'text-red-400' : 'text-slate-300'}`}>{d}</span><div className="flex flex-col items-end gap-1">{cl.total > 0 && <span className="text-[10px] font-black text-green-700 bg-white px-2 py-1 rounded-xl shadow-sm border border-green-100">{isIncognito ? 'xxx€' : cl.total.toFixed(2) + '€'}</span>}{cl.restHours > 0 && (<div className="flex items-center gap-1 text-blue-600 font-black text-[9px] bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 shadow-sm"><Icon name="coffee" size={10} /><span>{cl.restHours.toFixed(2)}h</span></div>)}</div></div><div className="space-y-1 overflow-y-auto no-scrollbar flex-1">{dt?.isReten && <div className="text-[8px] bg-indigo-600 text-white font-black px-2 py-1 rounded-lg text-center uppercase tracking-tighter mb-1">Retén</div>}{dt?.shift && <div className={`text-[9px] font-black text-center px-2 py-1 rounded-xl shadow-sm mb-2 ${SHIFTS.find(s => s.id === dt.shift)?.color || 'bg-slate-100'}`}>{dt.shift}</div>}<div className="space-y-1">{cl.items.map((it, idx) => (<div key={idx} className={`flex justify-between text-[8px] font-bold border-b border-slate-50 pb-0.5 ${it.type === 'coffee' ? 'text-blue-600' : 'text-slate-500'}`}><span className="truncate pr-1">{it.label}</span><span className="shrink-0">{it.type === 'coffee' ? (it.value.toFixed(2) + 'h') : (isIncognito ? 'xxx€' : it.value.toFixed(2) + '€')}</span></div>))}</div></div></div>); } return cells; })()}</div>
+                                    <div className="grid grid-cols-7">{(() => { const y = viewDate.getFullYear(), m = viewDate.getMonth(), s = (new Date(y, m, 1).getDay() + 6) % 7, t = new Date(y, m + 1, 0).getDate(), cells = []; for(let i=0; i<s; i++) cells.push(<div key={`e-${i}`} className="h-32 md:h-52 bg-slate-50/20 border border-slate-50"></div>); for(let d=1; d<=t; d++) { const ds = toISO(new Date(y, m, d)), dt = shifts[ds], cl = calcDay(ds, dt, annualPlan, shifts), isV = (new Date(y, m, d).getDay() === 0 || new Date(y, m, d).getDay() === 6 || dt?.isFestive || cl.items.some(i => i.label.toUpperCase().includes("FIESTA") || i.label.toUpperCase().includes("FESTIVO"))); cells.push(<div key={d} onClick={() => { setSelected({ day: d, ds, ...dt }); setUi({...ui, modal: true}); }} className={`h-56 md:h-64 border border-slate-100 p-3 cursor-pointer transition-all hover:bg-indigo-50 flex flex-col ${isV ? 'bg-red-50/20' : 'bg-white'}`}><div className="flex justify-between items-start mb-2"><span className={`text-[12px] font-black ${isV ? 'text-red-400' : 'text-slate-300'}`}>{d}</span><div className="flex flex-col items-end gap-1">{cl.total > 0 && <span className="text-[10px] font-black text-green-700 bg-white px-2 py-1 rounded-xl shadow-sm border border-green-100">{isIncognito ? 'xxx€' : cl.total.toFixed(2) + '€'}</span>}{cl.restHours > 0 && (<div className="flex items-center gap-1 text-blue-600 font-black text-[9px] bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 shadow-sm"><Icon name="coffee" size={10} /><span>{cl.restHours.toFixed(2)}h</span></div>)}</div></div><div className="space-y-1 overflow-y-auto no-scrollbar flex-1">{dt?.isReten && <div className="text-[8px] bg-indigo-600 text-white font-black px-2 py-1 rounded-lg text-center uppercase tracking-tighter mb-1">Retén</div>}{dt?.shift && <div className={`text-[9px] font-black text-center px-2 py-1 rounded-xl shadow-sm mb-2 ${SHIFTS.find(s => s.id === dt.shift)?.color || 'bg-slate-100'}`}>{dt.shift}</div>}<div className="space-y-1">{cl.items.map((it, idx) => (<div key={idx} className={`flex justify-between text-[8px] font-bold border-b border-slate-50 pb-0.5 ${it.type === 'coffee' ? 'text-blue-600' : 'text-slate-500'}`}><span className="truncate pr-1">{it.label}</span><span className="shrink-0">{it.type === 'coffee' ? (it.value.toFixed(2) + 'h') : (isIncognito ? 'xxx€' : it.value.toFixed(2) + '€')}</span></div>))}</div></div></div>); } return cells; })()}</div>
                                 </div>
                                 <div className="space-y-6 flex flex-col">
                                     <div className="bg-white p-10 rounded-[48px] shadow-2xl border border-slate-100 flex flex-col items-center"><div className="flex items-center gap-3 mb-10 w-full"><Icon name="bar-chart-3" size={24} className="text-[#6366F1]" /><h3 className="text-sm font-black uppercase text-[#8E97A1] tracking-widest">RESUMEN MES</h3></div><div className="space-y-6 w-full">{[{ l: 'BRUTO VARIABLE', v: stats.month.total, s: '€', c: 'text-[32px] font-black text-slate-950', m: true }, { l: 'DESCANSO ACUMULADO', v: stats.month.restHours, s: 'h', c: 'text-2xl font-black text-[#6366F1]' }, { l: 'HORAS EXTRA (PAGO)', v: stats.month.he.val, s: '€', m: true }, { l: 'NOCTURNIDAD', v: stats.month.night.val, s: '€', m: true }, { l: 'PLUS TRC', v: stats.month.trc.val, s: '€', m: true }, { l: 'PLUS LLAMADA', v: stats.month.call_plus.val, s: '€', m: true }, { l: 'COMP. LLAMADA', v: stats.month.call_comp.val, s: '€', m: true }, { l: 'KILOMETRAJE', v: stats.month.km.val, s: '€', m: true }, { l: 'AYUDA COMIDA', v: stats.month.food.val, s: '€', m: true }, { l: 'RETÉN TOTAL', v: stats.month.reten.val, s: '€', m: true }, { l: 'PLUS P1', v: stats.month.p1.val, s: '€', m: true }].map((i, idx) => (<div key={idx} className="flex flex-col border-b border-slate-50 pb-2 last:border-0"><span className="text-[10px] font-black text-[#8E97A1] uppercase tracking-[0.2em] mb-1">{i.l}</span><span className={i.c || 'text-lg font-black text-slate-800'}>{isIncognito && i.m ? 'xxx€' : (i.v.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + i.s)}</span></div>))}</div></div>
@@ -574,8 +671,8 @@
                                 </div>
                             </div>
                         )}
-                        {ui.tab === 'planner' && <PlannerView viewDate={viewDate} setViewDate={setViewDate} annualPlan={annualPlan} setAnnualPlan={setAnnualPlan} plannerCounters={plannerCounters} setPlannerCounters={setPlannerCounters} userColors={userColors} setUserColors={setUserColors} counterUsage={counterUsage} save={save} ui={ui} setUi={setUi} activeTool={activeTool} setActiveTool={setActiveTool} />}
-                        {ui.tab === 'stats' && <div className="animate-in grid grid-cols-1 gap-12 p-12 bg-white shadow-2xl rounded-[60px] border border-slate-100"><div className="flex flex-col items-center border-b border-slate-50 pb-8"><h2 className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Balance Detallado</h2><h3 className="text-2xl font-black text-slate-800 capitalize tracking-tight">{viewDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h3></div><div className="flex flex-col md:flex-row justify-between gap-10"><div className="w-full max-w-md flex flex-col items-center"><h3 className="text-sm font-black text-slate-400 mb-10 uppercase tracking-widest">Distribución de Conceptos</h3><div className="w-72 h-72 mx-auto relative"><DonutChart data={chartData} /></div></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6 w-full">{[{ label: 'Plus TRC', data: stats.month.trc, color: '#6366f1' }, { label: 'Plus TRA', data: stats.month.tra, color: '#f59e0b' }, { label: 'Plus Llamada', data: stats.month.call_plus, color: '#ef4444' }, { label: 'Comp. Llamada', data: stats.month.call_comp, color: '#f43f5e' }, { label: 'Ayuda Comida', data: stats.month.food, color: '#10b981' }, { label: 'Kilometraje', data: stats.month.km, color: '#0ea5e9', unit: 'km' }, { label: 'Horas Extras', data: stats.month.he, color: '#8b5cf6', unit: 'h' }, { label: 'Nocturnidad', data: stats.month.night, color: '#334155', unit: 'h' }, { label: 'Retén Total', data: stats.month.reten, color: '#4f46e5' }, { label: 'Plus P1', data: stats.month.p1, color: '#94a3b8' }, { label: 'Otros Conceptos', data: stats.month.custom, color: '#cbd5e1' }].map((i, idx) => (<div key={idx} className={`flex items-center justify-between p-4 rounded-3xl bg-slate-50 border border-slate-100 transition-all ${i.data.val > 0 ? 'opacity-100 shadow-sm' : 'opacity-30 grayscale'}`}><div className="flex items-center gap-4"><div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: i.color }}></div><span className="text-[11px] font-black uppercase text-slate-500">{i.label}</span></div><div className="flex items-baseline gap-2"><span className="text-[10px] font-bold text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-lg">(x{i.data.count.toLocaleString('es-ES', { maximumFractionDigits: 2 })}{i.unit || ''})</span><span className="text-sm font-black text-slate-900">{isIncognito ? 'xxx€' : (i.data.val.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '€')}</span></div></div>))}</div></div></div>}
+                        {ui.tab === 'planner' && <PlannerView viewDate={viewDate} setViewDate={setViewDate} annualPlan={annualPlan} setAnnualPlan={setAnnualPlan} plannerCounters={plannerCounters} setPlannerCounters={setPlannerCounters} userColors={userColors} setUserColors={setUserColors} counterUsage={counterUsage} save={save} ui={ui} setUi={setUi} activeTool={activeTool} setActiveTool={setActiveTool} weeklyRotation={weeklyRotation} setWeeklyRotation={setWeeklyRotation} shifts={shifts} setShifts={setShifts} />}
+                        {ui.tab === 'stats' && <div className="animate-in grid grid-cols-1 gap-12 p-12 bg-white shadow-2xl rounded-[60px] border border-slate-100"><div className="flex flex-col items-center border-b border-slate-50 pb-8"><h2 className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Balance Detallado</h2><h3 className="text-2xl font-black text-slate-800 capitalize tracking-tight">{viewDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h3></div><div className="flex flex-col md:flex-row justify-between gap-10"><div className="w-full max-w-md flex flex-col items-center"><h3 className="text-sm font-black text-slate-400 mb-10 uppercase tracking-widest">Distribución de Conceptos</h3><div className="w-72 h-72 mx-auto relative"><DonutChart data={chartData} /></div></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6 w-full">{[{ label: 'Plus TRC', data: stats.month.trc, color: '#6366f1' }, { label: 'Plus TRA', data: stats.month.tra, color: '#f59e0b' }, { label: 'Plus Llamada', data: stats.month.call_plus, color: '#ef4444' }, { label: 'Comp. Llamada', data: stats.month.call_comp, color: '#f43f5e' }, { label: 'Ayuda Comida', data: stats.month.food, color: '#10b981' }, { label: 'Kilometraje', data: stats.month.km, color: '#0ea5e9', unit: 'km' }, { label: 'Horas Extras', data: stats.month.he, color: '#8b5cf6', unit: 'h' }, { label: 'Nocturnidad', data: stats.month.night, color: '#334155', unit: 'h' }, { label: 'Retén Total', data: stats.month.reten, color: '#4f46e5' }, { label: 'Plus P1', data: stats.month.p1.val > 0 ? stats.month.p1 : { val: 0, count: 0 }, color: '#94a3b8' }, { label: 'Otros Conceptos', data: stats.month.custom, color: '#cbd5e1' }].map((i, idx) => (<div key={idx} className={`flex items-center justify-between p-4 rounded-3xl bg-slate-50 border border-slate-100 transition-all ${i.data.val > 0 ? 'opacity-100 shadow-sm' : 'opacity-30 grayscale'}`}><div className="flex items-center gap-4"><div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: i.color }}></div><span className="text-[11px] font-black uppercase text-slate-500">{i.label}</span></div><div className="flex items-baseline gap-2"><span className="text-[10px] font-bold text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-lg">(x{i.data.count.toLocaleString('es-ES', { maximumFractionDigits: 2 })}{i.unit || ''})</span><span className="text-sm font-black text-slate-900">{isIncognito ? 'xxx€' : (i.data.val.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '€')}</span></div></div>))}</div></div></div>}
                         {ui.tab === 'precios' && <PriceConfigPage globalRates={globalRates} setGlobalRates={setGlobalRates} salaryMatrix={salaryMatrix} setSalaryMatrix={setSalaryMatrix} profile={profile} save={save} />}
                     </div>
 
