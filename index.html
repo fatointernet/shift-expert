@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShiftExpert v22.2 - Control Horario</title>
+    <title>ShiftExpert v23.0 - Control Horario</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -228,6 +228,12 @@
                 if (activeTool === `cnt_${id}`) setActiveTool(null);
             };
 
+            const updateCounter = (id, field, value) => {
+                const n = plannerCounters.map(c => c.id === id ? { ...c, [field]: value } : c);
+                setPlannerCounters(n);
+                save(n, 'planner_counters');
+            };
+
             const changeYear = (delta) => {
                 const newDate = new Date(viewDate);
                 newDate.setFullYear(year + delta);
@@ -267,6 +273,7 @@
                     delete dayData.concept;
                 }
 
+                // Lógica de cálculo basada en Jornada Base
                 const h = hours !== null ? hours : (dayData.base === 'intensiva' ? 7.5 : dayData.base === 'partida' ? 8.5 : 8);
                 const existingIdx = dayData.concepts.findIndex(c => c.id === toolId);
                 if (existingIdx > -1) {
@@ -276,7 +283,8 @@
                 }
 
                 newPlan[ds] = dayData;
-                setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
+                setAnnualPlan(newPlan); 
+                save(newPlan, 'annual_plan');
                 syncFestive(ds, toolId);
                 setToolActionModal(null);
             };
@@ -384,8 +392,14 @@
                                     </div>
                                 )}
                                 <div className="pt-6 border-t border-slate-50 grid grid-cols-1 gap-2">
-                                    {!isViewMode && <button onClick={() => applyConcept(data.ds, data.toolId)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2"><Icon name="calendar-check" size={14} /> Día Completo (Añadir)</button>}
-                                    <button onClick={() => resetDay(data.ds)} className="w-full py-4 bg-red-50 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2"><Icon name="trash-2" size={14} /> Limpiar Todo el Día</button>
+                                    {!isViewMode && (
+                                        <button onClick={() => applyConcept(data.ds, data.toolId)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2">
+                                            <Icon name="calendar-check" size={14} /> Día Completo (Añadir)
+                                        </button>
+                                    )}
+                                    <button onClick={() => resetDay(data.ds)} className="w-full py-4 bg-red-50 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2">
+                                        <Icon name="trash-2" size={14} /> Limpiar Todo el Día
+                                    </button>
                                     <button onClick={() => setToolActionModal(null)} className="w-full py-3 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-600 transition-colors">Cerrar</button>
                                 </div>
                             </div>
@@ -417,9 +431,13 @@
                     </div>
                     <div className="flex flex-col lg:flex-row gap-8">
                         <div className="lg:w-72 shrink-0 space-y-4">
-                            <div className="bg-white p-6 rounded-[32px] shadow-xl border border-slate-100 sticky top-4">
-                                <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest flex items-center gap-2"><Icon name="mouse-pointer-2" size={14} className="text-indigo-600" /> Marcador</h4>
-                                <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
+                            {/* Sticky Sidebar Container */}
+                            <div className="bg-white rounded-[32px] shadow-xl border border-slate-100 sticky top-4 flex flex-col max-h-[85vh]">
+                                <div className="p-6 pb-2">
+                                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2"><Icon name="mouse-pointer-2" size={14} className="text-indigo-600" /> Marcador</h4>
+                                </div>
+                                
+                                <div className="flex-1 overflow-y-auto no-scrollbar px-6 space-y-2">
                                     <div className="pb-2 mb-2 border-b border-slate-50">
                                         <p className="text-[8px] font-black text-slate-300 uppercase mb-2">Jornada Base (Esquina)</p>
                                         {combinedTools.filter(t => t.isBase).map(tool => (
@@ -437,7 +455,13 @@
                                             {tool.isStatic && <div className="absolute right-10 top-1/2 -translate-y-1/2 p-1.5 text-slate-200" title="Concepto Fijo"><Icon name="lock" size={12} /></div>}
                                         </div>
                                     ))}
-                                    <button onClick={() => setActiveTool(null)} className="w-full mt-4 text-center py-3 text-[10px] font-black text-red-500 uppercase tracking-widest border-t border-slate-50 hover:bg-red-50 rounded-b-2xl">Limpiar Selección</button>
+                                </div>
+
+                                {/* Botón SIEMPRE VISIBLE */}
+                                <div className="p-4 border-t border-slate-50">
+                                    <button onClick={() => setActiveTool(null)} className="w-full text-center py-4 text-[10px] font-black text-red-500 uppercase tracking-widest hover:bg-red-50 rounded-2xl transition-colors">
+                                        Limpiar Selección
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -473,6 +497,7 @@
                             })}
                         </div>
                     </div>
+                    {/* Concept Table Footer */}
                     <div className="bg-white p-8 rounded-[48px] shadow-2xl border border-slate-100 overflow-hidden">
                         <div className="flex items-center gap-4 mb-8"><div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg"><Icon name="database" size={20} /></div><div><h4 className="text-lg font-black text-slate-800 tracking-tight">Conceptos y Bolsas de Horas</h4><p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Gestión de Saldos y Cálculo de Consumo</p></div></div>
                         <div className="overflow-x-auto no-scrollbar">
@@ -690,9 +715,9 @@
 
             return (
                 <div className="min-h-screen bg-slate-50 pb-20">
-                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">{user?.email}</span></div><div className="hidden md:block italic opacity-50">ShiftExpert v22.2</div></div>
+                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">{user?.email}</span></div><div className="hidden md:block italic opacity-50">ShiftExpert v23.0</div></div>
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v22.2</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Control Horario</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400"><Icon name="log-out" size={18}/></button></div></div>
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v23.0</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Control Horario</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400"><Icon name="log-out" size={18}/></button></div></div>
                         {ui.tab === 'calendar' && (
                             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in">
                                 <div className="lg:col-span-3 bg-white shadow-2xl rounded-[48px] overflow-hidden border border-slate-100">
