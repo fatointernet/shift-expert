@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShiftExpert v21.9 - Control Horario</title>
+    <title>ShiftExpert v21.5 - Control Horario</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -258,69 +258,32 @@
 
             const applyConcept = (ds, toolId, hours = null) => {
                 const newPlan = { ...annualPlan };
-                let dayData = newPlan[ds] ? { ...newPlan[ds] } : { base: null, concepts: [] };
-                
-                // Migración para datos antiguos que usaban "concept" en lugar de "concepts"
-                if (!dayData.concepts) {
-                    dayData.concepts = dayData.concept ? [{ id: dayData.concept, hours: dayData.manualHours || 8 }] : [];
-                    delete dayData.concept;
-                }
-
-                // Si hours es null, asumimos día completo basado en base
-                const h = hours !== null ? hours : (dayData.base === 'intensiva' ? 7.5 : dayData.base === 'partida' ? 8.5 : 8);
-
-                const existingIdx = dayData.concepts.findIndex(c => c.id === toolId);
-                if (existingIdx > -1) {
-                    dayData.concepts[existingIdx].hours = h;
-                } else {
-                    dayData.concepts.push({ id: toolId, hours: h });
-                }
-
-                newPlan[ds] = dayData;
+                let current = typeof newPlan[ds] === 'object' ? { ...newPlan[ds] } : { base: (newPlan[ds] === 'intensiva' || newPlan[ds] === 'partida' ? newPlan[ds] : null), concept: (newPlan[ds] && newPlan[ds] !== 'intensiva' && newPlan[ds] !== 'partida' ? newPlan[ds] : null) };
+                current.concept = toolId;
+                if (hours !== null) current.manualHours = hours;
+                else delete current.manualHours;
+                if (!current.base && !current.concept) delete newPlan[ds]; else newPlan[ds] = current;
                 setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
                 syncFestive(ds, toolId);
                 setToolActionModal(null);
             };
 
-            const removeConcept = (ds, toolId) => {
-                const newPlan = { ...annualPlan };
-                if (!newPlan[ds]) return;
-                
-                let dayData = { ...newPlan[ds] };
-                if (dayData.concepts) {
-                    dayData.concepts = dayData.concepts.filter(c => c.id !== toolId);
-                }
-                
-                if (!dayData.base && (!dayData.concepts || dayData.concepts.length === 0)) {
-                    delete newPlan[ds];
-                } else {
-                    newPlan[ds] = dayData;
-                }
-                
-                setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
-            };
-
             const togglePlanDay = (ds) => {
-                if (!activeTool) {
-                    // Si no hay herramienta seleccionada, abrimos modal de consulta si hay datos
-                    if (annualPlan[ds]) {
-                        setToolActionModal({ ds, mode: 'view' });
-                    }
-                    return;
-                }
-
+                if (!activeTool) return;
                 const tool = combinedTools.find(t => t.id === activeTool);
                 if (!tool) return;
-
                 if (tool.isBase) {
                     const newPlan = { ...annualPlan };
-                    let dayData = newPlan[ds] ? { ...newPlan[ds] } : { base: null, concepts: [] };
-                    dayData.base = dayData.base === activeTool ? null : activeTool;
-                    if (!dayData.base && (!dayData.concepts || dayData.concepts.length === 0)) delete newPlan[ds]; else newPlan[ds] = dayData;
+                    let current = typeof newPlan[ds] === 'object' ? { ...newPlan[ds] } : { base: (newPlan[ds] === 'intensiva' || newPlan[ds] === 'partida' ? newPlan[ds] : null), concept: (newPlan[ds] && newPlan[ds] !== 'intensiva' && newPlan[ds] !== 'partida' ? newPlan[ds] : null) };
+                    current.base = current.base === activeTool ? null : activeTool;
+                    if (!current.base && !current.concept) delete newPlan[ds]; else newPlan[ds] = current;
                     setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
                 } else {
-                    // Si es un concepto, abrimos modal para añadir/editar
-                    setToolActionModal({ ds, toolId: tool.id, toolLabel: tool.label, mode: 'add' });
+                    if (tool.id === 'static_festivo') {
+                        applyConcept(ds, tool.id);
+                    } else {
+                        setToolActionModal({ ds, toolId: tool.id, toolLabel: tool.label });
+                    }
                 }
             };
 
@@ -331,16 +294,14 @@
                 setToolActionModal(null);
             };
 
-            const ToolActionModal = ({ data }) => {
-                const isViewMode = data.mode === 'view';
-                const dayData = annualPlan[data.ds] || { concepts: [] };
-                
-                // Normalización de conceptos para vista
-                const activeConcepts = dayData.concepts || (dayData.concept ? [{ id: dayData.concept, hours: dayData.manualHours || 8 }] : []);
+            const updateCounter = (id, field, val) => {
+                const n = plannerCounters.map(c => c.id === id ? { ...c, [field]: val } : c);
+                setPlannerCounters(n); save(n, 'planner_counters');
+            };
 
+            const ToolActionModal = ({ data }) => {
                 const [start, setStart] = useState("08:00");
                 const [end, setEnd] = useState("16:00");
-
                 const handleTimed = () => {
                     const [hS, mS] = start.split(":").map(Number);
                     const [hE, mE] = end.split(":").map(Number);
@@ -348,66 +309,35 @@
                     if (totalHours <= 0) return;
                     applyConcept(data.ds, data.toolId, totalHours);
                 };
-
                 return (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in">
-                        <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden border border-slate-100">
+                        <div className="bg-white w-full max-sm rounded-[40px] shadow-2xl overflow-hidden border border-slate-100">
                             <div className="bg-slate-900 p-8 text-white">
                                 <div className="flex justify-between items-start mb-2">
-                                    <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">{isViewMode ? 'Consulta de Jornada' : 'Configuración de Imputación'}</p>
+                                    <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Configuración de Imputación</p>
                                     <button onClick={() => setToolActionModal(null)} className="text-white/40 hover:text-white transition-colors"><Icon name="x" size={20} /></button>
                                 </div>
-                                <h4 className="text-xl font-black uppercase tracking-tight">
-                                    {isViewMode ? `Día ${new Date(data.ds).getDate()}` : data.toolLabel}
-                                </h4>
+                                <h4 className="text-xl font-black uppercase tracking-tight">{data.toolLabel}</h4>
                             </div>
-
                             <div className="p-8 space-y-6">
-                                {isViewMode ? (
-                                    <div className="space-y-4">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Conceptos Asignados</p>
-                                        <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                                            {activeConcepts.map(c => {
-                                                const tool = combinedTools.find(t => t.id === c.id);
-                                                return (
-                                                    <div key={c.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-3 h-3 rounded-full ${tool?.color || 'bg-slate-300'}`} style={tool?.customColor ? {backgroundColor: tool.customColor} : {}}></div>
-                                                            <span className="text-[10px] font-black text-slate-700 uppercase">{tool?.label || 'Desconocido'}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-[10px] font-black text-indigo-600">{formatTimeStr(c.hours)}h</span>
-                                                            <button onClick={() => removeConcept(data.ds, c.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Icon name="trash-2" size={14} /></button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                            {activeConcepts.length === 0 && <p className="text-center text-slate-300 text-[10px] font-bold py-4">Sin conceptos</p>}
+                                <div className="space-y-4">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Definir Rango Horario</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-bold text-slate-400 uppercase ml-2">Entrada</label>
+                                            <input type="time" className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500" value={start} onChange={e => setStart(e.target.value)} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-bold text-slate-400 uppercase ml-2">Salida</label>
+                                            <input type="time" className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500" value={end} onChange={e => setEnd(e.target.value)} />
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Definir Rango Horario</p>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase ml-2">Entrada</label>
-                                                <input type="time" className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500" value={start} onChange={e => setStart(e.target.value)} />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase ml-2">Salida</label>
-                                                <input type="time" className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500" value={end} onChange={e => setEnd(e.target.value)} />
-                                            </div>
-                                        </div>
-                                        <button onClick={handleTimed} className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg active:scale-95">Aplicar Horas</button>
-                                    </div>
-                                )}
-
+                                    <button onClick={handleTimed} className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg active:scale-95">Aplicar Minutos</button>
+                                </div>
                                 <div className="pt-6 border-t border-slate-50 grid grid-cols-1 gap-2">
-                                    {!isViewMode && (
-                                        <button onClick={() => applyConcept(data.ds, data.toolId)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2"><Icon name="calendar-check" size={14} /> Día Completo (Añadir)</button>
-                                    )}
-                                    <button onClick={() => resetDay(data.ds)} className="w-full py-4 bg-red-50 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2"><Icon name="trash-2" size={14} /> Limpiar Todo el Día</button>
-                                    <button onClick={() => setToolActionModal(null)} className="w-full py-3 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-600 transition-colors">Cerrar</button>
+                                    <button onClick={() => applyConcept(data.ds, data.toolId)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2"><Icon name="calendar-check" size={14} /> Día Completo</button>
+                                    <button onClick={() => resetDay(data.ds)} className="w-full py-4 bg-red-50 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2"><Icon name="trash-2" size={14} /> Eliminar Día</button>
+                                    <button onClick={() => setToolActionModal(null)} className="w-full py-3 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-600 transition-colors">Cancelar</button>
                                 </div>
                             </div>
                         </div>
@@ -528,51 +458,11 @@
 
         const PlannerDayCell = ({ d, ds, annualPlan, combinedTools, togglePlanDay }) => {
             const p = annualPlan[ds];
-            const bId = p?.base;
-            
-            // Recoger todos los conceptos asignados
-            let assignedConceptIds = [];
-            if (p && p.concepts) {
-                assignedConceptIds = p.concepts.map(c => c.id);
-            } else if (p && p.concept) {
-                assignedConceptIds = [p.concept];
-            }
-
-            const assignedTools = assignedConceptIds.map(id => combinedTools.find(t => t.id === id)).filter(Boolean);
-            const tB = combinedTools.find(t => t.id === bId);
-            
-            const getBackground = () => {
-                if (assignedTools.length === 0) return null;
-                if (assignedTools.length === 1) {
-                    const tool = assignedTools[0];
-                    return tool.customColor || (tool.color.startsWith('bg-[') ? tool.color.match(/\[(.*?)\]/)[1] : '');
-                }
-                
-                const gradientParts = assignedTools.map((tool, idx) => {
-                    const color = tool.customColor || (tool.color.startsWith('bg-[') ? tool.color.match(/\[(.*?)\]/)[1] : '');
-                    const start = (idx / assignedTools.length) * 100;
-                    const end = ((idx + 1) / assignedTools.length) * 100;
-                    return `${color} ${start}%, ${color} ${end}%`;
-                });
-                return `linear-gradient(to bottom, ${gradientParts.join(', ')})`;
-            };
-
-            const bgStyle = getBackground();
-            const isCustomBg = bgStyle && (bgStyle.includes('linear-gradient') || bgStyle.startsWith('#') || bgStyle.startsWith('rgb'));
-
-            // Calcular suma total de horas para mostrar
-            const totalHours = p?.concepts ? p.concepts.reduce((acc, curr) => acc + curr.hours, 0) : (p?.manualHours || 0);
-
+            const bId = typeof p === 'object' ? p.base : (p === 'intensiva' || p === 'partida' ? p : null);
+            const cId = typeof p === 'object' ? p.concept : (p && p !== 'intensiva' && p !== 'partida' ? p : null);
+            const tC = combinedTools.find(t => t.id === cId), tB = combinedTools.find(t => t.id === bId);
             return (
-                <div 
-                    onClick={() => togglePlanDay(ds)} 
-                    className={`planner-day h-8 flex items-center justify-center rounded-lg text-[10px] font-black cursor-pointer border shadow-sm transition-all ${!bgStyle ? 'bg-slate-50 text-slate-400 border-transparent hover:border-indigo-100' : (!isCustomBg ? assignedTools[0].color : '')}`}
-                    style={isCustomBg ? { background: bgStyle, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.2)' } : {}}
-                >
-                    {tB && <div className="corner-base" style={{ borderLeftColor: 'transparent', borderTopColor: tB.customColor || (tB.id === 'intensiva' ? '#facc15' : '#cbd5e1') }}></div>}
-                    {d}
-                    {totalHours > 0 && <div className="absolute bottom-0 right-0 bg-white/40 px-0.5 rounded-[2px] text-[5px] font-bold text-slate-700 leading-none">{formatTimeStr(totalHours)}</div>}
-                </div>
+                <div onClick={() => togglePlanDay(ds)} className={`planner-day h-8 flex items-center justify-center rounded-lg text-[10px] font-black cursor-pointer border shadow-sm transition-all ${tC ? (tC.customColor ? '' : tC.color) : 'bg-slate-50 text-slate-400 border-transparent hover:border-indigo-100'}`} style={tC && tC.customColor ? { backgroundColor: tC.customColor, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.2)' } : {}}>{tB && <div className="corner-base" style={{ borderLeftColor: 'transparent', borderTopColor: tB.customColor || (tB.id === 'intensiva' ? '#facc15' : '#cbd5e1') }}></div>}{d}{p?.manualHours !== undefined && <div className="absolute bottom-0 right-0 bg-white/40 px-0.5 rounded-[2px] text-[5px] font-bold text-slate-700 leading-none">{formatTimeStr(p.manualHours)}</div>}</div>
             );
         };
 
@@ -582,7 +472,7 @@
             return (
                 <div className="space-y-12 animate-in pb-20">
                     <section className="bg-white p-8 rounded-[40px] shadow-xl border border-slate-100"><div className="flex justify-between items-center mb-10"><div><h3 className="text-xl font-black uppercase tracking-tight">Tarifas Globales</h3></div><button onClick={sv} className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg active:scale-95">Guardar</button></div><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">{Object.entries(lG).map(([k, v]) => (<div key={k} className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-2 leading-tight block">{GLOBAL_LABELS[k] || k}</label><div className="relative"><input type="number" step="0.01" className="w-full bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 font-black text-slate-800 outline-none" value={v} onChange={e => slG({...lG, [k]: parseFloat(e.target.value) || 0})} /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 font-black text-[10px]">€</span></div></div>))}</div></section>
-                    <section className="bg-slate-900 p-8 rounded-[40px] shadow-2xl overflow-x-auto no-scrollbar"><h3 className="text-xl font-black text-white mb-10 uppercase tracking-tight">Matriz Salarial ({profile.group})</h3><table className="w-full text-left min-w-[900px]"><thead><tr className="text-[10px] font-black text-slate-500 uppercase border-b border-slate-800"><th className="pb-4 px-4">Grupo</th><th className="pb-4 px-4 text-center">H. Ordinaria</th>{['HE', 'Noche', 'Plus Llamada', 'Retén L', 'Retén F'].map(h => <th key={h} className="pb-4 px-4 text-center">{h}</th>)}</tr></thead><tbody>{Object.entries(lM).filter(([g]) => g === profile.group).map(([g, rgs]) => Object.entries(rgs).filter(([r]) => r === (parseInt(profile.level) <= 9 ? "1-9" : "10-12")).map(([r, d]) => (<tr key={`${g}-${r}`} className="border-b border-slate-800/50 bg-white/5 hover:bg-white/10 transition-all"><td className="py-4 px-4"><span className="text-xs font-black block text-indigo-400">{g}</span><span className="text-[9px] font-bold text-slate-500 uppercase">Nivel {profile.level}</span></td><td className="py-2 px-2 text-center font-bold text-xs text-white/40">{(d.extra / 1.75).toFixed(6)}</td>{Object.entries(d).map(([f, v]) => (<td key={f} className="py-2 px-2"><input type="number" step="0.01" className="w-full bg-slate-800/50 p-2 rounded-xl text-center text-xs font-bold border outline-none text-indigo-400 border-indigo-900" value={v} onChange={e => { const nM = {...lM}; nM[g][r][f] = parseFloat(e.target.value) || 0; slM(nM); }} /></td>))}</tr>)))}</tbody></table></section>
+                    <section className="bg-slate-900 p-8 rounded-[40px] shadow-2xl overflow-x-auto no-scrollbar"><h3 className="text-xl font-black text-white mb-10 uppercase tracking-tight">Matriz Salarial ({profile.group})</h3><table className="w-full text-left min-w-[900px]"><thead><tr className="text-[10px] font-black text-slate-500 uppercase border-b border-slate-800"><th className="pb-4 px-4">Grupo</th>{['HE', 'Noche', 'Plus Llamada', 'Retén L', 'Retén F'].map(h => <th key={h} className="pb-4 px-4 text-center">{h}</th>)}</tr></thead><tbody>{Object.entries(lM).filter(([g]) => g === profile.group).map(([g, rgs]) => Object.entries(rgs).filter(([r]) => r === (parseInt(profile.level) <= 9 ? "1-9" : "10-12")).map(([r, d]) => (<tr key={`${g}-${r}`} className="border-b border-slate-800/50 bg-white/5 hover:bg-white/10 transition-all"><td className="py-4 px-4"><span className="text-xs font-black block text-indigo-400">{g}</span><span className="text-[9px] font-bold text-slate-500 uppercase">Nivel {profile.level}</span></td>{Object.entries(d).map(([f, v]) => (<td key={f} className="py-2 px-2"><input type="number" step="0.01" className="w-full bg-slate-800/50 p-2 rounded-xl text-center text-xs font-bold border outline-none text-indigo-400 border-indigo-900" value={v} onChange={e => { const nM = {...lM}; nM[g][r][f] = parseFloat(e.target.value) || 0; slM(nM); }} /></td>))}</tr>)))}</tbody></table></section>
                 </div>
             );
         };
@@ -640,19 +530,12 @@
             const calcDay = useCallback((dateStr, data, plan, allShifts) => {
                 if (!data) return { total: 0, restHours: 0, items: [] };
                 const pEntry = plan?.[dateStr];
+                const conceptId = typeof pEntry === 'object' ? pEntry.concept : (pEntry && pEntry !== 'intensiva' && pEntry !== 'partida' ? pEntry : null);
                 
-                let conceptIds = [];
-                if (typeof pEntry === 'object') {
-                    conceptIds = pEntry.concepts ? pEntry.concepts.map(c => c.id) : (pEntry.concept ? [pEntry.concept] : []);
-                } else if (pEntry && pEntry !== 'intensiva' && pEntry !== 'partida') {
-                    conceptIds = [pEntry];
-                }
-
-                const isPlannerFestive = conceptIds.some(id => {
-                    if (id === 'static_festivo') return true;
-                    const pc = plannerCounters.find(c => `cnt_${c.id}` === id);
-                    return pc && (pc.desc.toUpperCase().includes("FIESTA") || pc.desc.toUpperCase().includes("FESTIVO"));
-                });
+                const isStaticFestive = conceptId === 'static_festivo';
+                const plannerCounter = plannerCounters.find(c => `cnt_${c.id}` === conceptId);
+                const isDynamicFestive = plannerCounter && (plannerCounter.desc.toUpperCase().includes("FIESTA") || plannerCounter.desc.toUpperCase().includes("FESTIVO"));
+                const isPlannerFestive = isStaticFestive || isDynamicFestive;
 
                 const d = new Date(dateStr);
                 const isSunday = d.getDay() === 0;
@@ -696,11 +579,7 @@
                     const h = parseFloat(data.extras) || 0;
                     if (h > 0) {
                         const isNf = isF || (parseFloat(data.horasNocturnas) > 0);
-                        if (data.extraCompMode === 'mixed') { 
-                            res.restHours += h; 
-                            res.items.push({ label: `Descanso HE (1x)`, value: h, type: 'coffee', qty: h }); 
-                            add(`HE Cobro (0.75x)`, h * (rates.extra / 1.75) * 0.75, 'he', h); 
-                        }
+                        if (data.extraCompMode === 'mixed') { res.restHours += h; res.items.push({ label: `Descanso HE (1x)`, value: h, type: 'coffee', qty: h }); add(`HE Cobro (0.75x)`, h * rates.extra * 0.75, 'he', h); }
                         else if (data.extraCompMode === 'rest_total') { const mult = isNf ? 2 : 1.75; res.restHours += h * mult; res.items.push({ label: `Descanso HE (${mult}x)`, value: h * mult, type: 'coffee', qty: h * mult }); }
                         else add(`HE Cobro 100%`, h * rates.extra, 'he', h);
                     }
@@ -729,19 +608,11 @@
                 const usage = {};
                 Object.entries(annualPlan).forEach(([ds, plan]) => {
                     if (!plan) return;
-                    
-                    let conceptList = [];
-                    if (plan.concepts) {
-                        conceptList = plan.concepts;
-                    } else if (plan.concept) {
-                        conceptList = [{ id: plan.concept, hours: plan.manualHours || 8 }];
+                    let conceptId = typeof plan === 'object' ? plan.concept : (plan !== 'intensiva' && plan !== 'partida' ? plan : null);
+                    let base = typeof plan === 'object' ? plan.base : (plan === 'intensiva' || plan === 'partida' ? plan : null);
+                    if (conceptId && conceptId.startsWith('cnt_')) {
+                        usage[conceptId] = (usage[conceptId] || 0) + (plan.manualHours !== undefined ? plan.manualHours : (base === 'intensiva' ? 7.5 : base === 'partida' ? 8.5 : 8));
                     }
-
-                    conceptList.forEach(c => {
-                        if (c.id && c.id.startsWith('cnt_')) {
-                            usage[c.id] = (usage[c.id] || 0) + c.hours;
-                        }
-                    });
                 });
                 return usage;
             }, [annualPlan]);
@@ -782,9 +653,9 @@
 
             return (
                 <div className="min-h-screen bg-slate-50 pb-20">
-                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">Sesión activa: {user?.email}</span></div><div className="hidden md:block italic opacity-50">ShiftExpert v21.9</div></div>
+                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">Sesión activa: {user?.email}</span></div><div className="hidden md:block italic opacity-50">ShiftExpert v21.5</div></div>
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v21.9</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Control Horario</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400 hover:text-indigo-600"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400 hover:text-red-600"><Icon name="log-out" size={18}/></button></div></div>
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v21.5</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Control Horario</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400 hover:text-indigo-600"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400 hover:text-red-600"><Icon name="log-out" size={18}/></button></div></div>
                         
                         {ui.tab === 'calendar' && (
                             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in">
