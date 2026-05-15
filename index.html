@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShiftExpert v22.1 - Sincronización Festivos</title>
+    <title>ShiftExpert v22.2 - Multi-Concepto</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -114,19 +114,19 @@
         ];
 
         const DYNAMIC_PLANNER_COLORS = [
-            { bg: 'bg-rose-600', text: 'text-white' },
-            { bg: 'bg-emerald-600', text: 'text-white' },
-            { bg: 'bg-violet-700', text: 'text-white' },
-            { bg: 'bg-cyan-400', text: 'text-slate-900' },
-            { bg: 'bg-amber-500', text: 'text-white' },
-            { bg: 'bg-lime-400', text: 'text-slate-900' },
-            { bg: 'bg-slate-800', text: 'text-white' },
-            { bg: 'bg-fuchsia-500', text: 'text-white' },
-            { bg: 'bg-sky-700', text: 'text-white' },
-            { bg: 'bg-orange-600', text: 'text-white' },
-            { bg: 'bg-teal-300', text: 'text-slate-900' },
-            { bg: 'bg-indigo-900', text: 'text-white' },
-            { bg: 'bg-pink-300', text: 'text-slate-900' }
+            { bg: 'bg-rose-600', hex: '#e11d48', text: 'text-white' },
+            { bg: 'bg-emerald-600', hex: '#059669', text: 'text-white' },
+            { bg: 'bg-violet-700', hex: '#6d28d9', text: 'text-white' },
+            { bg: 'bg-cyan-400', hex: '#22d3ee', text: 'text-slate-900' },
+            { bg: 'bg-amber-500', hex: '#f59e0b', text: 'text-white' },
+            { bg: 'bg-lime-400', hex: '#a3e635', text: 'text-slate-900' },
+            { bg: 'bg-slate-800', hex: '#1e293b', text: 'text-white' },
+            { bg: 'bg-fuchsia-500', hex: '#d946ef', text: 'text-white' },
+            { bg: 'bg-sky-700', hex: '#0369a1', text: 'text-white' },
+            { bg: 'bg-orange-600', hex: '#ea580c', text: 'text-white' },
+            { bg: 'bg-teal-300', hex: '#5eead4', text: 'text-slate-900' },
+            { bg: 'bg-indigo-900', hex: '#312e81', text: 'text-white' },
+            { bg: 'bg-pink-300', hex: '#f9a8d4', text: 'text-slate-900' }
         ];
 
         const BASIC_PALETTE = [
@@ -195,6 +195,7 @@
             const year = viewDate.getFullYear();
             const months = Array.from({ length: 12 }, (_, i) => i);
             const [toolActionModal, setToolActionModal] = useState(null);
+            const [dayEditModal, setDayEditModal] = useState(null);
 
             const deleteCounter = (id) => {
                 const n = plannerCounters.filter(c => c.id !== id);
@@ -209,11 +210,13 @@
                     rawId: c.id,
                     label: c.desc, 
                     color: DYNAMIC_PLANNER_COLORS[idx % DYNAMIC_PLANNER_COLORS.length].bg, 
+                    hex: DYNAMIC_PLANNER_COLORS[idx % DYNAMIC_PLANNER_COLORS.length].hex,
                     textColor: DYNAMIC_PLANNER_COLORS[idx % DYNAMIC_PLANNER_COLORS.length].text, 
                     isBase: false,
                     isCustom: true
                 }));
-                return [...PLANNER_TOOLS, ...counterTools].map(t => ({ ...t, customColor: userColors[t.id] || null }));
+                const festivoTool = { id: 'festivo_especial', label: 'FESTIVO', color: 'bg-red-500', hex: '#ef4444', textColor: 'text-white', isBase: false, isCustom: false };
+                return [...PLANNER_TOOLS, festivoTool, ...counterTools].map(t => ({ ...t, customColor: userColors[t.id] || null }));
             }, [plannerCounters, userColors]);
 
             const changeYear = (delta) => {
@@ -229,14 +232,30 @@
             };
 
             const togglePlanDay = (ds) => {
-                if (!activeTool) return;
+                if (!activeTool) {
+                    setDayEditModal(ds);
+                    return;
+                }
                 const tool = combinedTools.find(t => t.id === activeTool);
                 if (!tool) return;
                 if (tool.isBase) {
                     const newPlan = { ...annualPlan };
-                    let current = typeof newPlan[ds] === 'object' ? { ...newPlan[ds] } : { base: (newPlan[ds] === 'intensiva' || newPlan[ds] === 'partida' ? newPlan[ds] : null), concept: (newPlan[ds] && newPlan[ds] !== 'intensiva' && newPlan[ds] !== 'partida' ? newPlan[ds] : null) };
+                    let current = { base: null, concepts: {} };
+                    
+                    if (typeof newPlan[ds] === 'object') {
+                        current.base = newPlan[ds].base || null;
+                        if (newPlan[ds].concepts) current.concepts = { ...newPlan[ds].concepts };
+                        else if (newPlan[ds].concept) current.concepts = { [newPlan[ds].concept]: newPlan[ds].manualHours !== undefined ? newPlan[ds].manualHours : null };
+                    } else if (typeof newPlan[ds] === 'string') {
+                        if (['intensiva', 'partida'].includes(newPlan[ds])) current.base = newPlan[ds];
+                        else current.concepts = { [newPlan[ds]]: null };
+                    }
+
                     current.base = current.base === activeTool ? null : activeTool;
-                    if (!current.base && !current.concept) delete newPlan[ds]; else newPlan[ds] = current;
+                    
+                    if (!current.base && Object.keys(current.concepts).length === 0) delete newPlan[ds];
+                    else newPlan[ds] = current;
+                    
                     setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
                 } else {
                     setToolActionModal({ ds, toolId: tool.id, toolLabel: tool.label });
@@ -245,11 +264,20 @@
 
             const applyConcept = (ds, toolId, hours = null) => {
                 const newPlan = { ...annualPlan };
-                let current = typeof newPlan[ds] === 'object' ? { ...newPlan[ds] } : { base: (newPlan[ds] === 'intensiva' || newPlan[ds] === 'partida' ? newPlan[ds] : null), concept: (newPlan[ds] && newPlan[ds] !== 'intensiva' && newPlan[ds] !== 'partida' ? newPlan[ds] : null) };
-                current.concept = toolId;
-                if (hours !== null) current.manualHours = hours;
-                else delete current.manualHours;
-                if (!current.base && !current.concept) delete newPlan[ds]; else newPlan[ds] = current;
+                let current = { base: null, concepts: {} };
+                
+                if (typeof newPlan[ds] === 'object') {
+                    current.base = newPlan[ds].base || null;
+                    if (newPlan[ds].concepts) current.concepts = { ...newPlan[ds].concepts };
+                    else if (newPlan[ds].concept) current.concepts = { [newPlan[ds].concept]: newPlan[ds].manualHours !== undefined ? newPlan[ds].manualHours : null };
+                } else if (typeof newPlan[ds] === 'string') {
+                    if (['intensiva', 'partida'].includes(newPlan[ds])) current.base = newPlan[ds];
+                    else current.concepts = { [newPlan[ds]]: null };
+                }
+
+                current.concepts[toolId] = hours;
+
+                newPlan[ds] = current;
                 setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
                 setToolActionModal(null);
             };
@@ -269,6 +297,18 @@
             const ToolActionModal = ({ data }) => {
                 const [start, setStart] = useState("08:00");
                 const [end, setEnd] = useState("16:00");
+                
+                const planDay = annualPlan[data.ds];
+                let isApplied = false;
+                if (planDay) {
+                    if (typeof planDay === 'object') {
+                        if (planDay.concepts) isApplied = data.toolId in planDay.concepts;
+                        else if (planDay.concept) isApplied = planDay.concept === data.toolId;
+                    } else if (typeof planDay === 'string') {
+                        isApplied = planDay === data.toolId;
+                    }
+                }
+
                 const handleTimed = () => {
                     const [hS, mS] = start.split(":").map(Number);
                     const [hE, mE] = end.split(":").map(Number);
@@ -276,6 +316,27 @@
                     if (totalHours <= 0) return;
                     applyConcept(data.ds, data.toolId, totalHours);
                 };
+
+                const removeConcept = () => {
+                    const newPlan = { ...annualPlan };
+                    let current = { base: null, concepts: {} };
+                    if (typeof newPlan[data.ds] === 'object') {
+                        current.base = newPlan[data.ds].base || null;
+                        if (newPlan[data.ds].concepts) current.concepts = { ...newPlan[data.ds].concepts };
+                        else if (newPlan[data.ds].concept) current.concepts = { [newPlan[data.ds].concept]: newPlan[data.ds].manualHours !== undefined ? newPlan[data.ds].manualHours : null };
+                    } else if (typeof newPlan[data.ds] === 'string') {
+                        if (['intensiva', 'partida'].includes(newPlan[data.ds])) current.base = newPlan[data.ds];
+                        else current.concepts = { [newPlan[data.ds]]: null };
+                    }
+                    
+                    delete current.concepts[data.toolId];
+                    if (!current.base && Object.keys(current.concepts).length === 0) delete newPlan[data.ds];
+                    else newPlan[data.ds] = current;
+                    
+                    setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
+                    setToolActionModal(null);
+                };
+
                 return (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in">
                         <div className="bg-white w-full max-sm rounded-[40px] shadow-2xl overflow-hidden border border-slate-100">
@@ -303,6 +364,9 @@
                                 </div>
                                 <div className="pt-6 border-t border-slate-50 grid grid-cols-1 gap-2">
                                     <button onClick={() => applyConcept(data.ds, data.toolId)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2"><Icon name="calendar-check" size={14} /> Día Completo</button>
+                                    {isApplied && (
+                                        <button onClick={removeConcept} className="w-full py-4 bg-orange-50 text-orange-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-100 transition-all active:scale-95 flex items-center justify-center gap-2"><Icon name="minus-circle" size={14} /> Quitar Concepto</button>
+                                    )}
                                     <button onClick={() => resetDay(data.ds)} className="w-full py-4 bg-red-50 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2"><Icon name="trash-2" size={14} /> Eliminar Día</button>
                                     <button onClick={() => setToolActionModal(null)} className="w-full py-3 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-600 transition-colors">Cancelar</button>
                                 </div>
@@ -312,9 +376,121 @@
                 );
             };
 
+            const DayEditModal = ({ ds }) => {
+                const [localData, setLocalData] = useState(() => {
+                    const p = annualPlan[ds];
+                    let current = { base: null, concepts: {} };
+                    if (p) {
+                        if (typeof p === 'object') {
+                            current.base = p.base || null;
+                            if (p.concepts) current.concepts = { ...p.concepts };
+                            else if (p.concept) current.concepts = { [p.concept]: p.manualHours !== undefined ? p.manualHours : null };
+                        } else if (typeof p === 'string') {
+                            if (['intensiva', 'partida'].includes(p)) current.base = p;
+                            else current.concepts = { [p]: null };
+                        }
+                    }
+                    return current;
+                });
+
+                const handleHourChange = (cId, val) => {
+                    const num = parseFloat(val);
+                    setLocalData(prev => ({
+                        ...prev,
+                        concepts: {
+                            ...prev.concepts,
+                            [cId]: isNaN(num) ? null : num
+                        }
+                    }));
+                };
+
+                const handleRemoveConcept = (cId) => {
+                    setLocalData(prev => {
+                        const nc = {...prev.concepts};
+                        delete nc[cId];
+                        return { ...prev, concepts: nc };
+                    });
+                };
+
+                const handleRemoveBase = () => {
+                    setLocalData(prev => ({ ...prev, base: null }));
+                };
+
+                const handleSave = () => {
+                    const newPlan = { ...annualPlan };
+                    if (!localData.base && Object.keys(localData.concepts).length === 0) {
+                        delete newPlan[ds];
+                    } else {
+                        newPlan[ds] = localData;
+                    }
+                    setAnnualPlan(newPlan);
+                    save(newPlan, 'annual_plan');
+                    setDayEditModal(null);
+                };
+
+                const getToolInfo = (id) => combinedTools.find(t => t.id === id) || { label: id, color: 'bg-slate-200 text-slate-800' };
+                const dateObj = new Date(ds);
+                const dateStr = dateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+                return (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in">
+                        <div className="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden border border-slate-100">
+                            <div className="bg-slate-900 p-8 text-white">
+                                <div className="flex justify-between items-start mb-2">
+                                    <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Resumen del Día</p>
+                                    <button onClick={() => setDayEditModal(null)} className="text-white/40 hover:text-white transition-colors"><Icon name="x" size={20} /></button>
+                                </div>
+                                <h4 className="text-lg font-black capitalize tracking-tight">{dateStr}</h4>
+                            </div>
+                            <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto no-scrollbar">
+                                {(!localData.base && Object.keys(localData.concepts).length === 0) ? (
+                                    <p className="text-xs font-bold text-slate-400 text-center uppercase tracking-widest py-4">Sin datos imputados</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {localData.base && (
+                                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-3 h-3 rounded-full ${getToolInfo(localData.base).customColor ? '' : getToolInfo(localData.base).color}`} style={getToolInfo(localData.base).customColor ? { backgroundColor: getToolInfo(localData.base).customColor } : {}}></div>
+                                                    <span className="text-[10px] font-black uppercase text-slate-700">{getToolInfo(localData.base).label}</span>
+                                                </div>
+                                                <button onClick={handleRemoveBase} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Icon name="trash-2" size={14} /></button>
+                                            </div>
+                                        )}
+                                        {Object.entries(localData.concepts).map(([cId, hrs]) => (
+                                            <div key={cId} className="flex flex-col gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-3 h-3 rounded-full ${getToolInfo(cId).customColor || getToolInfo(cId).hex ? '' : getToolInfo(cId).color}`} style={{ backgroundColor: getToolInfo(cId).customColor || getToolInfo(cId).hex }}></div>
+                                                        <span className="text-[10px] font-black uppercase text-slate-700 truncate max-w-[150px]">{getToolInfo(cId).label}</span>
+                                                    </div>
+                                                    <button onClick={() => handleRemoveConcept(cId)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Icon name="trash-2" size={14} /></button>
+                                                </div>
+                                                <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-100">
+                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">Horas Manuales:</span>
+                                                    <input 
+                                                        type="number" 
+                                                        step="0.01" 
+                                                        className="w-20 bg-transparent text-right text-xs font-black text-indigo-600 outline-none" 
+                                                        placeholder="Auto"
+                                                        value={hrs !== null && hrs !== undefined ? hrs : ''} 
+                                                        onChange={(e) => handleHourChange(cId, e.target.value)} 
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <button onClick={handleSave} className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg active:scale-95">Guardar Cambios</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
             return (
                 <div className="space-y-12 animate-in relative">
                     {toolActionModal && <ToolActionModal data={toolActionModal} />}
+                    {dayEditModal && <DayEditModal ds={dayEditModal} />}
                     {ui.colorPicker && (
                         <>
                             <div className="fixed inset-0 z-[110]" onClick={() => setUi({ ...ui, colorPicker: null })}></div>
@@ -335,9 +511,9 @@
                     </div>
                     <div className="flex flex-col lg:flex-row gap-8">
                         <div className="lg:w-72 shrink-0 space-y-4">
-                            <div className="bg-white p-6 rounded-[32px] shadow-xl border border-slate-100 sticky top-4">
-                                <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest flex items-center gap-2"><Icon name="mouse-pointer-2" size={14} className="text-indigo-600" /> Marcador</h4>
-                                <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
+                            <div className="bg-white p-6 rounded-[32px] shadow-xl border border-slate-100 sticky top-4 flex flex-col max-h-[calc(100vh-2rem)]">
+                                <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest flex items-center gap-2 shrink-0"><Icon name="mouse-pointer-2" size={14} className="text-indigo-600" /> Marcador</h4>
+                                <div className="space-y-2 overflow-y-auto no-scrollbar flex-1 pb-4 pr-1">
                                     <div className="pb-2 mb-2 border-b border-slate-50">
                                         <p className="text-[8px] font-black text-slate-300 uppercase mb-2">Jornada Base (Esquina)</p>
                                         {combinedTools.filter(t => t.isBase).map(tool => (
@@ -356,7 +532,9 @@
                                             )}
                                         </div>
                                     ))}
-                                    <button onClick={() => setActiveTool(null)} className="w-full mt-4 text-center py-3 text-[10px] font-black text-red-500 uppercase tracking-widest border-t border-slate-50 hover:bg-red-50 rounded-b-2xl">Limpiar Selección</button>
+                                </div>
+                                <div className="pt-2 border-t border-slate-100 shrink-0">
+                                    <button onClick={() => setActiveTool(null)} className="w-full text-center py-3 text-[10px] font-black text-red-500 uppercase tracking-widest hover:bg-red-50 rounded-2xl transition-colors">Limpiar Selección</button>
                                 </div>
                             </div>
                         </div>
@@ -366,18 +544,111 @@
                                 return (
                                     <div key={m} className="bg-white p-6 rounded-[32px] shadow-lg border border-slate-100 flex flex-col">
                                         <h5 className="text-xs font-black uppercase text-slate-800 mb-4 text-center tracking-[0.2em]">{mName}</h5>
-                                        <div className="grid grid-cols-7 gap-1">
+                                        <div className="grid grid-cols-8 gap-1">
+                                            <div className="text-[8px] font-black text-slate-300 text-center py-1">T</div>
                                             {['L','M','X','J','V','S','D'].map(d => <div key={d} className="text-[8px] font-black text-slate-300 text-center py-1">{d}</div>)}
-                                            {Array.from({ length: fD }).map((_, i) => <div key={`e-${i}`}></div>)}
-                                            {Array.from({ length: dInM }).map((_, i) => {
-                                                const d = i + 1, ds = toISO(new Date(year, m, d)), p = annualPlan[ds];
-                                                const bId = typeof p === 'object' ? p.base : (p === 'intensiva' || p === 'partida' ? p : null);
-                                                const cId = typeof p === 'object' ? p.concept : (p && p !== 'intensiva' && p !== 'partida' ? p : null);
-                                                const tC = combinedTools.find(t => t.id === cId), tB = combinedTools.find(t => t.id === bId);
-                                                return (
-                                                    <div key={d} onClick={() => togglePlanDay(ds)} className={`planner-day h-8 flex items-center justify-center rounded-lg text-[10px] font-black cursor-pointer border shadow-sm transition-all ${tC ? (tC.customColor ? '' : tC.color) : 'bg-slate-50 text-slate-400 border-transparent hover:border-indigo-100'}`} style={tC && tC.customColor ? { backgroundColor: tC.customColor, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.2)' } : {}}>{tB && <div className="corner-base" style={{ borderLeftColor: 'transparent', borderTopColor: tB.customColor || (tB.id === 'intensiva' ? '#facc15' : '#cbd5e1') }}></div>}{d}{p?.manualHours !== undefined && <div className="absolute bottom-0 right-0 bg-white/40 px-0.5 rounded-[2px] text-[5px] font-bold text-slate-700 leading-none">{formatTimeStr(p.manualHours)}</div>}</div>
-                                                );
-                                            })}
+                                            
+                                            {(() => {
+                                                const weeks = [];
+                                                let currentWeek = Array(7).fill(null);
+                                                let dayCount = 1;
+                                                for (let i = 0; i < fD; i++) currentWeek[i] = null;
+                                                for (let i = fD; i < 7; i++) currentWeek[i] = dayCount++;
+                                                weeks.push(currentWeek);
+                                                while (dayCount <= dInM) {
+                                                    currentWeek = Array(7).fill(null);
+                                                    for (let i = 0; i < 7 && dayCount <= dInM; i++) currentWeek[i] = dayCount++;
+                                                    weeks.push(currentWeek);
+                                                }
+
+                                                return weeks.map((week, wIdx) => {
+                                                    const weekKey = `w_${year}_${m}_${wIdx}`;
+                                                    const weekShift = annualPlan[weekKey] || '';
+                                                    const toggleWeekShift = () => {
+                                                        const newShift = weekShift === 'M' ? 'T' : (weekShift === 'T' ? '' : 'M');
+                                                        const newPlan = { ...annualPlan };
+                                                        if (newShift === '') delete newPlan[weekKey];
+                                                        else newPlan[weekKey] = newShift;
+                                                        setAnnualPlan(newPlan);
+                                                        save(newPlan, 'annual_plan');
+                                                    };
+
+                                                    return (
+                                                        <React.Fragment key={`w-${wIdx}`}>
+                                                            <div onClick={toggleWeekShift} className="planner-day h-8 flex items-center justify-center rounded-lg text-[9px] font-black cursor-pointer border shadow-sm transition-all bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100">
+                                                                {weekShift}
+                                                            </div>
+                                                            {week.map((d, dIdx) => {
+                                                                if (d === null) return <div key={`e-${wIdx}-${dIdx}`}></div>;
+                                                                const ds = toISO(new Date(year, m, d)), p = annualPlan[ds];
+                                                                
+                                                                let bId = null;
+                                                                let activeConceptIds = [];
+                                                                let manualHoursSum = 0;
+                                                                let hasHours = false;
+
+                                                                if (p) {
+                                                                    if (typeof p === 'object') {
+                                                                        bId = p.base;
+                                                                        if (p.concepts) {
+                                                                            activeConceptIds = Object.keys(p.concepts);
+                                                                            activeConceptIds.forEach(id => {
+                                                                                if (p.concepts[id] !== null && p.concepts[id] !== undefined) {
+                                                                                    manualHoursSum += p.concepts[id];
+                                                                                    hasHours = true;
+                                                                                }
+                                                                            });
+                                                                        } else if (p.concept) {
+                                                                            activeConceptIds = [p.concept];
+                                                                            if (p.manualHours !== undefined) {
+                                                                                manualHoursSum = p.manualHours;
+                                                                                hasHours = true;
+                                                                            }
+                                                                        }
+                                                                    } else if (typeof p === 'string') {
+                                                                        if (['intensiva', 'partida'].includes(p)) bId = p;
+                                                                        else activeConceptIds = [p];
+                                                                    }
+                                                                }
+
+                                                                const tB = combinedTools.find(t => t.id === bId);
+                                                                const activeToolsList = activeConceptIds.map(id => combinedTools.find(t => t.id === id)).filter(Boolean);
+
+                                                                let dayClass = `planner-day h-8 flex items-center justify-center rounded-lg text-[10px] font-black cursor-pointer border shadow-sm transition-all `;
+                                                                let dayStyle = {};
+
+                                                                if (activeToolsList.length === 0) {
+                                                                    dayClass += "bg-slate-50 text-slate-400 border-transparent hover:border-indigo-100";
+                                                                } else if (activeToolsList.length === 1) {
+                                                                    const tC = activeToolsList[0];
+                                                                    if (tC.customColor) {
+                                                                        dayStyle = { backgroundColor: tC.customColor, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.2)' };
+                                                                    } else {
+                                                                        dayClass += tC.color;
+                                                                    }
+                                                                } else {
+                                                                    dayClass += "text-white border-transparent ";
+                                                                    dayStyle.textShadow = '0 1px 2px rgba(0,0,0,0.5)';
+                                                                    const perc = 100 / activeToolsList.length;
+                                                                    const stops = activeToolsList.map((tC, i) => {
+                                                                        const color = tC.customColor || tC.hex || '#ccc';
+                                                                        return `${color} ${i * perc}%, ${color} ${(i + 1) * perc}%`;
+                                                                    }).join(', ');
+                                                                    dayStyle.background = `linear-gradient(135deg, ${stops})`;
+                                                                }
+
+                                                                return (
+                                                                    <div key={d} onClick={() => togglePlanDay(ds)} className={dayClass} style={dayStyle}>
+                                                                        {tB && <div className="corner-base" style={{ borderLeftColor: 'transparent', borderTopColor: tB.customColor || (tB.id === 'intensiva' ? '#facc15' : '#cbd5e1') }}></div>}
+                                                                        {d}
+                                                                        {hasHours && <div className="absolute bottom-0 right-0 bg-white/40 px-0.5 rounded-[2px] text-[5px] font-bold text-slate-700 leading-none shadow-sm">{formatTimeStr(manualHoursSum)}</div>}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </React.Fragment>
+                                                    );
+                                                });
+                                            })()}
                                         </div>
                                     </div>
                                 );
@@ -500,12 +771,22 @@
                 return g[range] || g["1-9"];
             }, [profile, salaryMatrix]);
 
+            const getPlanConcepts = (planDay) => {
+                if (!planDay) return [];
+                if (typeof planDay === 'object') {
+                    if (planDay.concepts) return Object.keys(planDay.concepts);
+                    if (planDay.concept) return [planDay.concept];
+                }
+                if (typeof planDay === 'string' && !['intensiva', 'partida'].includes(planDay)) return [planDay];
+                return [];
+            };
+
             const calcDay = useCallback((dateStr, data, plan, allShifts) => {
                 if (!data) return { total: 0, restHours: 0, items: [] };
                 const d = new Date(dateStr), isSunday = d.getDay() === 0, isSaturday = d.getDay() === 6;
                 const planDay = plan?.[dateStr];
-                // cnt_1 y cnt_3 son los códigos base para festivos oficiales y locales
-                const isPlanFestive = planDay?.concept === 'cnt_1' || planDay?.concept === 'cnt_3';
+                
+                const isPlanFestive = getPlanConcepts(planDay).some(c => ['cnt_1', 'cnt_3', 'festivo_especial'].includes(c));
                 const isF = isSunday || isSaturday || data.isFestive || isPlanFestive;
                 const isFriday = d.getDay() === 5;
                 const res = { total: 0, restHours: 0, items: [] };
@@ -517,7 +798,7 @@
                     const nextDayISO = toISO(nextDay); 
                     const nDayData = allShifts?.[nextDayISO];
                     const nDayPlan = plan?.[nextDayISO];
-                    const isNextPlanFestive = nDayPlan?.concept === 'cnt_1' || nDayPlan?.concept === 'cnt_3';
+                    const isNextPlanFestive = getPlanConcepts(nDayPlan).some(c => ['cnt_1', 'cnt_3', 'festivo_especial'].includes(c));
                     const isNextWeekend = nextDay.getDay() === 0 || nextDay.getDay() === 6;
                     
                     if (!(isNextWeekend || nDayData?.isFestive || isNextPlanFestive)) {
@@ -591,9 +872,21 @@
                 const usage = {};
                 Object.entries(annualPlan).forEach(([ds, plan]) => {
                     if (!plan) return;
-                    let base = typeof plan === 'object' ? plan.base : (plan === 'intensiva' || plan === 'partida' ? plan : null);
-                    let conceptId = typeof plan === 'object' ? plan.concept : (plan !== 'intensiva' && plan !== 'partida' ? plan : null);
-                    if (conceptId) { usage[conceptId] = (usage[conceptId] || 0) + (plan.manualHours !== undefined ? plan.manualHours : (base === 'intensiva' ? 7.5 : base === 'partida' ? 8.5 : 8)); }
+                    let base = null;
+                    let concepts = {};
+
+                    if (typeof plan === 'object') {
+                        base = plan.base;
+                        if (plan.concepts) concepts = plan.concepts;
+                        else if (plan.concept) concepts[plan.concept] = plan.manualHours !== undefined ? plan.manualHours : null;
+                    } else if (typeof plan === 'string') {
+                        if (['intensiva', 'partida'].includes(plan)) base = plan;
+                        else concepts[plan] = null;
+                    }
+
+                    Object.entries(concepts).forEach(([cId, hrs]) => {
+                        usage[cId] = (usage[cId] || 0) + (hrs !== null && hrs !== undefined ? hrs : (base === 'intensiva' ? 7.5 : base === 'partida' ? 8.5 : 8));
+                    });
                 });
                 return usage;
             }, [annualPlan]);
@@ -612,11 +905,15 @@
                 <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
                     <div className="bg-slate-900 w-full max-sm rounded-[40px] shadow-2xl p-10 border border-slate-800 animate-in">
                         <div className="flex flex-col items-center mb-10"><Icon name="calendar" size={40} className="text-indigo-500 mb-4" /><h1 className="text-2xl font-black text-white uppercase tracking-tight">ShiftExpert</h1></div>
+                        {(ui.error || ui.info) && <div className={`p-3 rounded-xl text-xs font-bold text-center mb-4 ${ui.error ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>{ui.error || ui.info}</div>}
                         <form onSubmit={handleAuth} className="space-y-4">
                             <input type="email" required className="w-full bg-slate-800 p-4 rounded-2xl text-white text-sm" placeholder="Email" value={authFields.email} onChange={e => setAuthFields({...authFields, email: e.target.value})} />
                             <input type="password" required className="w-full bg-slate-800 p-4 rounded-2xl text-white text-sm" placeholder="Contraseña" value={authFields.pass} onChange={e => setAuthFields({...authFields, pass: e.target.value})} />
                             <button type="submit" className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase text-xs tracking-widest">{authFields.mode === 'login' ? 'Entrar' : 'Registrarse'}</button>
                             <button type="button" onClick={() => setAuthFields({...authFields, mode: authFields.mode === 'login' ? 'register' : 'login'})} className="w-full text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2">{authFields.mode === 'login' ? 'Crear Cuenta' : 'Tengo cuenta'}</button>
+                            {authFields.mode === 'login' && (
+                                <button type="button" onClick={async () => { if(!authFields.email) { setUi(p => ({...p, error: 'Introduce tu email en el campo superior.', info: ''})); return; } try { await sendPasswordResetEmail(auth, authFields.email); setUi(p => ({...p, info: 'Email de recuperación enviado.', error: ''})); } catch(e) { setUi(p => ({...p, error: 'Error al enviar email.', info: ''})); } }} className="w-full text-[10px] font-black text-indigo-400 uppercase tracking-widest mt-4 hover:text-indigo-300 transition-colors">Recuperar contraseña</button>
+                            )}
                         </form>
                     </div>
                 </div>
@@ -624,16 +921,16 @@
 
             return (
                 <div className="min-h-screen bg-slate-50 pb-20">
-                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">Sesión activa: {user?.email}</span></div><div className="hidden md:block italic opacity-50">ANAV ShiftExpert v22.1</div></div>
+                    <div className="w-full bg-slate-900 text-slate-400 py-2 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest shadow-md"><div className="flex items-center gap-2"><Icon name="user" size={12} className="text-indigo-500" /><span className="text-white">Sesión activa: {user?.email}</span></div><div className="hidden md:block italic opacity-50">ANAV ShiftExpert v22.2</div></div>
                     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v22.1</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Sincronización Festivos</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400 hover:text-indigo-600"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400 hover:text-red-600"><Icon name="log-out" size={18}/></button></div></div>
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6"><div className="flex items-center gap-5"><div className="bg-indigo-600 p-5 rounded-3xl text-white shadow-xl rotate-3"><Icon name="calendar" size={28} /></div><div><h2 className="text-2xl font-black text-slate-900 tracking-tight">ShiftExpert v22.2</h2><p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Multi-Concepto</p></div></div><div className="flex bg-white p-1.5 rounded-[24px] shadow-lg border border-slate-100 overflow-hidden items-center"><button onClick={() => setIsIncognito(!isIncognito)} className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all mr-1 ${isIncognito ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600'}`}><Icon name={isIncognito ? "eye-off" : "eye"} size={16} /><span className="text-[10px] font-black uppercase">{isIncognito ? 'ON' : 'Incógnito'}</span></button>{['calendar', 'planner', 'stats', 'precios'].map(t => (<button key={t} onClick={() => setUi({...ui, tab: t})} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${ui.tab === t ? 'bg-slate-900 text-white shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'precios' ? 'Precios' : t === 'stats' ? 'Balance' : t === 'planner' ? 'Planificador' : 'Calendario'}</button>))}<button onClick={() => setUi({...ui, settings: true})} className="px-4 py-3 text-indigo-400 hover:text-indigo-600"><Icon name="user-cog" size={18}/></button><button onClick={() => signOut(auth)} className="px-4 py-3 text-red-400 hover:text-red-600"><Icon name="log-out" size={18}/></button></div></div>
                         
                         {ui.tab === 'calendar' && (
                             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in">
                                 <div className="lg:col-span-3 bg-white shadow-2xl rounded-[48px] overflow-hidden border border-slate-100">
                                     <div className="flex justify-between items-center p-8 border-b border-slate-50"><button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))} className="p-4 bg-slate-50 rounded-3xl hover:bg-indigo-50 transition-all"><Icon name="chevron-left" size={24}/></button><h3 className="text-xl font-black text-slate-800 capitalize tracking-tight">{viewDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h3><button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))} className="p-4 bg-slate-50 rounded-3xl hover:bg-indigo-50 transition-all"><Icon name="chevron-right" size={24}/></button></div>
                                     <div className="grid grid-cols-7 bg-slate-900 text-white py-4 text-center text-[9px] font-black uppercase opacity-90">{['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => <div key={d}>{d}</div>)}</div>
-                                    <div className="grid grid-cols-7">{(() => { const y = viewDate.getFullYear(), m = viewDate.getMonth(), s = (new Date(y, m, 1).getDay() + 6) % 7, t = new Date(y, m + 1, 0).getDate(), cells = []; for(let i=0; i<s; i++) cells.push(<div key={`e-${i}`} className="h-32 md:h-52 bg-slate-50/20 border border-slate-50"></div>); for(let d=1; d<=t; d++) { const ds = toISO(new Date(y, m, d)), dt = shifts[ds], cl = calcDay(ds, dt, annualPlan, shifts), isV = (new Date(y, m, d).getDay() === 0 || new Date(y, m, d).getDay() === 6 || dt?.isFestive); cells.push(<div key={d} onClick={() => { setSelected({ day: d, ds, ...dt }); setUi({...ui, modal: true}); }} className={`h-56 md:h-64 border border-slate-100 p-3 cursor-pointer transition-all hover:bg-indigo-50 flex flex-col ${isV ? 'bg-red-50/20' : 'bg-white'}`}><div className="flex justify-between items-start mb-2"><span className={`text-[12px] font-black ${isV ? 'text-red-400' : 'text-slate-300'}`}>{d}</span><div className="flex flex-col items-end gap-1">{cl.total > 0 && <span className="text-[10px] font-black text-green-700 bg-white px-2 py-1 rounded-xl shadow-sm border border-green-100">{isIncognito ? 'xxx€' : cl.total.toFixed(2) + '€'}</span>}{cl.restHours > 0 && (<div className="flex items-center gap-1 text-blue-600 font-black text-[9px] bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 shadow-sm"><Icon name="coffee" size={10} /><span>{cl.restHours.toFixed(2)}h</span></div>)}</div></div><div className="space-y-1 overflow-y-auto no-scrollbar flex-1">{dt?.isReten && <div className="text-[8px] bg-indigo-600 text-white font-black px-2 py-1 rounded-lg text-center uppercase tracking-tighter mb-1">Retén</div>}{dt?.shift && <div className={`text-[9px] font-black text-center px-2 py-1 rounded-xl shadow-sm mb-2 ${SHIFTS.find(s => s.id === dt.shift)?.color || 'bg-slate-100'}`}>{dt.shift}</div>}<div className="space-y-1">{cl.items.map((it, idx) => (<div key={idx} className={`flex justify-between text-[8px] font-bold border-b border-slate-50 pb-0.5 ${it.type === 'coffee' ? 'text-blue-600' : 'text-slate-500'}`}><span className="truncate pr-1">{it.label}</span><span className="shrink-0">{it.type === 'coffee' ? (it.value.toFixed(2) + 'h') : (isIncognito ? 'xxx€' : it.value.toFixed(2) + '€')}</span></div>))}</div></div></div>); } return cells; })()}</div>
+                                    <div className="grid grid-cols-7">{(() => { const y = viewDate.getFullYear(), m = viewDate.getMonth(), s = (new Date(y, m, 1).getDay() + 6) % 7, t = new Date(y, m + 1, 0).getDate(), cells = []; for(let i=0; i<s; i++) cells.push(<div key={`e-${i}`} className="h-32 md:h-52 bg-slate-50/20 border border-slate-50"></div>); for(let d=1; d<=t; d++) { const ds = toISO(new Date(y, m, d)), dt = shifts[ds], cl = calcDay(ds, dt, annualPlan, shifts), isPF = getPlanConcepts(annualPlan[ds]).some(c => ['cnt_1', 'cnt_3', 'festivo_especial'].includes(c)), isV = (new Date(y, m, d).getDay() === 0 || new Date(y, m, d).getDay() === 6 || dt?.isFestive || isPF); cells.push(<div key={d} onClick={() => { setSelected({ day: d, ds, ...dt }); setUi({...ui, modal: true}); }} className={`h-56 md:h-64 border border-slate-100 p-3 cursor-pointer transition-all hover:bg-indigo-50 flex flex-col ${isV ? 'bg-red-50/20' : 'bg-white'}`}><div className="flex justify-between items-start mb-2"><span className={`text-[12px] font-black ${isV ? 'text-red-400' : 'text-slate-300'}`}>{d}</span><div className="flex flex-col items-end gap-1">{cl.total > 0 && <span className="text-[10px] font-black text-green-700 bg-white px-2 py-1 rounded-xl shadow-sm border border-green-100">{isIncognito ? 'xxx€' : cl.total.toFixed(2) + '€'}</span>}{cl.restHours > 0 && (<div className="flex items-center gap-1 text-blue-600 font-black text-[9px] bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 shadow-sm"><Icon name="coffee" size={10} /><span>{cl.restHours.toFixed(2)}h</span></div>)}</div></div><div className="space-y-1 overflow-y-auto no-scrollbar flex-1">{dt?.isReten && <div className="text-[8px] bg-indigo-600 text-white font-black px-2 py-1 rounded-lg text-center uppercase tracking-tighter mb-1">Retén</div>}{(dt?.shift || isPF) && <div className={`text-[9px] font-black text-center px-2 py-1 rounded-xl shadow-sm mb-2 ${dt?.shift ? (SHIFTS.find(s => s.id === dt.shift)?.color || 'bg-slate-100') : 'bg-red-500 text-white'}`}>{dt?.shift || 'FESTIVO'}</div>}<div className="space-y-1">{cl.items.map((it, idx) => (<div key={idx} className={`flex justify-between text-[8px] font-bold border-b border-slate-50 pb-0.5 ${it.type === 'coffee' ? 'text-blue-600' : 'text-slate-500'}`}><span className="truncate pr-1">{it.label}</span><span className="shrink-0">{it.type === 'coffee' ? (it.value.toFixed(2) + 'h') : (isIncognito ? 'xxx€' : it.value.toFixed(2) + '€')}</span></div>))}</div></div></div>); } return cells; })()}</div>
                                 </div>
                                 <div className="space-y-6 flex flex-col">
                                     <div className="bg-white p-10 rounded-[48px] shadow-2xl border border-slate-100 flex flex-col items-center"><div className="flex items-center gap-3 mb-10 w-full"><Icon name="bar-chart-3" size={24} className="text-[#6366F1]" /><h3 className="text-sm font-black uppercase text-[#8E97A1] tracking-widest">RESUMEN MES</h3></div><div className="space-y-6 w-full">{[{ l: 'BRUTO VARIABLE', v: stats.month.total, s: '€', c: 'text-[32px] font-black text-slate-950', m: true }, { l: 'DESCANSO ACUMULADO', v: stats.month.restHours, s: 'h', c: 'text-2xl font-black text-[#6366F1]' }, { l: 'HORAS EXTRA (PAGO)', v: stats.month.he.val, s: '€', m: true }, { l: 'NOCTURNIDAD', v: stats.month.night.val, s: '€', m: true }, { l: 'PLUS TRC', v: stats.month.trc.val, s: '€', m: true }, { l: 'PLUS LLAMADA', v: stats.month.call_plus.val, s: '€', m: true }, { id: 'custom', l: 'OTROS CONCEPTOS', v: stats.month.custom.val, s: '€', m: true }, { l: 'KILOMETRAJE', v: stats.month.km.val, s: '€', m: true }, { l: 'RETÉN TOTAL', v: stats.month.reten.val, s: '€', m: true }].map((i, idx) => (<div key={idx} className="flex flex-col border-b border-slate-50 pb-2 last:border-0"><span className="text-[10px] font-black text-[#8E97A1] uppercase tracking-[0.2em] mb-1">{i.l}</span><span className={i.c || 'text-lg font-black text-slate-800'}>{isIncognito && i.m ? 'xxx€' : (i.v.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + i.s)}</span></div>))}</div></div>
@@ -652,10 +949,10 @@
                                 <div className="bg-[#111827] p-8 text-white flex justify-between items-center"><div><p className="text-indigo-400 text-[10px] font-black uppercase mb-1 tracking-widest">EDITOR DE JORNADA</p><h3 className="text-3xl font-black tracking-tighter">{selected.day} de {viewDate.toLocaleDateString('es-ES', { month: 'long' })}</h3></div><button onClick={() => setUi({...ui, modal: false})} className="p-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-colors"><Icon name="x" size={24} /></button></div>
                                 <div className="p-8 max-h-[75vh] overflow-y-auto no-scrollbar space-y-8">
                                     <div className="grid grid-cols-2 gap-4">
-                                        <section onClick={() => { const nr = !selected.isReten; const d = new Date(selected.ds); const planDay = annualPlan[selected.ds]; const isPlanFestive = typeof planDay === 'object' ? (planDay?.concept === 'cnt_1' || planDay?.concept === 'cnt_3') : false; const isF = d.getDay() === 0 || d.getDay() === 6 || selected.isFestive || isPlanFestive; let newConcepts = { ...selected.activeConceptsCount }; if (isF && selected.shift && selected.shift !== 'D') { if (nr) delete newConcepts.comp_llamada; else newConcepts.comp_llamada = 1; } const upd = {...selected, isReten: nr, activeConceptsCount: newConcepts}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer ${selected.isReten ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-100 bg-slate-50 opacity-60'}`}><div className="flex items-center gap-4"><Icon name="shield-check" size={24} /><h4 className="font-bold">Retén</h4></div><div className={`w-8 h-8 rounded-full border-4 ${selected.isReten ? 'bg-indigo-600 border-indigo-200' : 'bg-white border-slate-200'}`}></div></section>
-                                        <section onClick={() => { const nf = !selected.isFestive; const d = new Date(selected.ds); const planDay = annualPlan[selected.ds]; const isPlanFestive = typeof planDay === 'object' ? (planDay?.concept === 'cnt_1' || planDay?.concept === 'cnt_3') : false; const isF = nf || d.getDay() === 0 || d.getDay() === 6 || isPlanFestive; const baseType = typeof planDay === 'object' ? planDay?.base : planDay; const baseH = isF ? (['R7', 'R9'].includes(selected.shift) ? 12.0 : selected.shift === 'I7' ? 7.5 : 8.5) : (['R7', 'R9'].includes(selected.shift) ? (baseType === 'intensiva' ? 4.0 : 3.5) : 0); let newConcepts = { ...selected.activeConceptsCount }; if (selected.shift && selected.shift !== 'D') { if (isF) { newConcepts.comp_km = 1; newConcepts.plus_llamada = 1; newConcepts.comida = 1; if (!selected.isReten) newConcepts.comp_llamada = 1; else delete newConcepts.comp_llamada; } else { newConcepts = {}; if (['R7', 'R9'].includes(selected.shift)) newConcepts = { trc: 1, comida: 1 }; else if (['S1', 'S3', 'S5'].includes(selected.shift)) newConcepts = { trc: 1 }; else if (['R1', 'R3'].includes(selected.shift)) newConcepts = { tra: 1 }; } } let upd = {...selected, isFestive: nf, extras: baseH, activeConceptsCount: newConcepts}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer ${selected.isFestive ? 'border-red-600 bg-red-50 shadow-md' : 'border-slate-100 bg-slate-50 opacity-60'}`}><div className="flex items-center gap-4"><Icon name="party-popper" size={24} /><h4 className="font-bold">Festivo</h4></div><div className={`w-8 h-8 rounded-full border-4 ${selected.isFestive ? 'bg-red-600 border-red-200' : 'bg-white border-slate-200'}`}></div></section>
+                                        <section onClick={() => { const nr = !selected.isReten; const d = new Date(selected.ds); const planDay = annualPlan[selected.ds]; const isPlanFestive = getPlanConcepts(planDay).some(c => ['cnt_1', 'cnt_3', 'festivo_especial'].includes(c)); const isF = d.getDay() === 0 || d.getDay() === 6 || selected.isFestive || isPlanFestive; let newConcepts = { ...selected.activeConceptsCount }; if (isF && selected.shift && selected.shift !== 'D') { if (nr) delete newConcepts.comp_llamada; else newConcepts.comp_llamada = 1; } const upd = {...selected, isReten: nr, activeConceptsCount: newConcepts}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer ${selected.isReten ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-100 bg-slate-50 opacity-60'}`}><div className="flex items-center gap-4"><Icon name="shield-check" size={24} /><h4 className="font-bold">Retén</h4></div><div className={`w-8 h-8 rounded-full border-4 ${selected.isReten ? 'bg-indigo-600 border-indigo-200' : 'bg-white border-slate-200'}`}></div></section>
+                                        <section onClick={() => { const d = new Date(selected.ds); const planDay = annualPlan[selected.ds]; const isPlanFestive = getPlanConcepts(planDay).some(c => ['cnt_1', 'cnt_3', 'festivo_especial'].includes(c)); const isCurrentlyFestive = selected.isFestive || isPlanFestive; const nf = !isCurrentlyFestive; const isF = nf || d.getDay() === 0 || d.getDay() === 6 || (isPlanFestive && nf !== false); const baseType = typeof planDay === 'object' ? planDay?.base : planDay; const baseH = isF ? (['R7', 'R9'].includes(selected.shift) ? 12.0 : selected.shift === 'I7' ? 7.5 : 8.5) : (['R7', 'R9'].includes(selected.shift) ? (baseType === 'intensiva' ? 4.0 : 3.5) : 0); let newConcepts = { ...selected.activeConceptsCount }; if (selected.shift && selected.shift !== 'D') { if (isF) { newConcepts.comp_km = 1; newConcepts.plus_llamada = 1; newConcepts.comida = 1; if (!selected.isReten) newConcepts.comp_llamada = 1; else delete newConcepts.comp_llamada; } else { newConcepts = {}; if (['R7', 'R9'].includes(selected.shift)) newConcepts = { trc: 1, comida: 1 }; else if (['S1', 'S3', 'S5'].includes(selected.shift)) newConcepts = { trc: 1 }; else if (['R1', 'R3'].includes(selected.shift)) newConcepts = { tra: 1 }; } } let upd = {...selected, isFestive: nf, extras: baseH, activeConceptsCount: newConcepts}; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`p-5 rounded-[28px] border-4 flex items-center justify-between cursor-pointer ${selected.isFestive || getPlanConcepts(annualPlan[selected.ds]).some(c => ['cnt_1', 'cnt_3', 'festivo_especial'].includes(c)) ? 'border-red-600 bg-red-50 shadow-md' : 'border-slate-100 bg-slate-50 opacity-60'}`}><div className="flex items-center gap-4"><Icon name="party-popper" size={24} /><h4 className="font-bold">Festivo</h4></div><div className={`w-8 h-8 rounded-full border-4 ${selected.isFestive || getPlanConcepts(annualPlan[selected.ds]).some(c => ['cnt_1', 'cnt_3', 'festivo_especial'].includes(c)) ? 'bg-red-600 border-red-200' : 'bg-white border-slate-200'}`}></div></section>
                                     </div>
-                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4">Turno</label><div className="grid grid-cols-5 gap-2">{SHIFTS.map(s => (<button key={s.id} onClick={() => { const d = new Date(selected.ds); const planDay = annualPlan[selected.ds]; const isPlanFestive = typeof planDay === 'object' ? (planDay?.concept === 'cnt_1' || planDay?.concept === 'cnt_3') : false; const f = d.getDay() === 0 || d.getDay() === 6 || selected.isFestive || isPlanFestive; const baseType = typeof planDay === 'object' ? planDay?.base : planDay; const baseH = f ? (['R7', 'R9'].includes(s.id) ? 12.0 : s.id === 'I7' ? 7.5 : 8.5) : (['R7', 'R9'].includes(s.id) ? (baseType === 'intensiva' ? 4.0 : 3.5) : 0); let newConcepts = {}; if (s.id !== 'D') { if (['R7', 'R9'].includes(s.id)) newConcepts = { trc: 1, comida: 1 }; else if (['S1', 'S3', 'S5'].includes(s.id)) newConcepts = { trc: 1 }; else if (['R1', 'R3'].includes(s.id)) newConcepts = { tra: 1 }; if (f) { newConcepts.comp_km = 1; newConcepts.plus_llamada = 1; newConcepts.comida = 1; if (!selected.isReten) newConcepts.comp_llamada = 1; } } const upd = { ...selected, shift: s.id, activeConceptsCount: newConcepts, extras: baseH, horasNocturnas: ((s.id === 'S5' || s.id === 'R9') ? 8 : (s.id === 'R3') ? 0.5 : 0) }; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[10px] ${selected.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-100 text-slate-400'}`}>{s.id}</button>))}</div></section>
+                                    <section><label className="text-[10px] font-black uppercase text-slate-400 block mb-4">Turno</label><div className="grid grid-cols-5 gap-2">{SHIFTS.map(s => (<button key={s.id} onClick={() => { const d = new Date(selected.ds); const planDay = annualPlan[selected.ds]; const isPlanFestive = getPlanConcepts(planDay).some(c => ['cnt_1', 'cnt_3', 'festivo_especial'].includes(c)); const f = d.getDay() === 0 || d.getDay() === 6 || selected.isFestive || isPlanFestive; const baseType = typeof planDay === 'object' ? planDay?.base : planDay; const baseH = f ? (['R7', 'R9'].includes(s.id) ? 12.0 : s.id === 'I7' ? 7.5 : 8.5) : (['R7', 'R9'].includes(s.id) ? (baseType === 'intensiva' ? 4.0 : 3.5) : 0); let newConcepts = {}; if (s.id !== 'D') { if (['R7', 'R9'].includes(s.id)) newConcepts = { trc: 1, comida: 1 }; else if (['S1', 'S3', 'S5'].includes(s.id)) newConcepts = { trc: 1 }; else if (['R1', 'R3'].includes(s.id)) newConcepts = { tra: 1 }; if (f) { newConcepts.comp_km = 1; newConcepts.plus_llamada = 1; newConcepts.comida = 1; if (!selected.isReten) newConcepts.comp_llamada = 1; } } const upd = { ...selected, shift: s.id, activeConceptsCount: newConcepts, extras: baseH, horasNocturnas: ((s.id === 'S5' || s.id === 'R9') ? 8 : (s.id === 'R3') ? 0.5 : 0) }; setSelected(upd); const ns = {...shifts, [upd.ds]: upd}; setShifts(ns); save(ns, 'shifts'); }} className={`py-3 rounded-xl border-2 font-black text-[10px] ${selected.shift === s.id ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-100 text-slate-400'}`}>{s.id}</button>))}</div></section>
                                     <section>
                                         <label className="text-[10px] font-black uppercase text-slate-400 block mb-4">Conceptos</label>
                                         <div className="space-y-3">
