@@ -257,6 +257,29 @@
                     else newPlan[ds] = current;
                     
                     setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
+                } else if (tool.id === 'festivo_especial') {
+                    const newPlan = { ...annualPlan };
+                    let current = { base: null, concepts: {} };
+                    
+                    if (typeof newPlan[ds] === 'object') {
+                        current.base = newPlan[ds].base || null;
+                        if (newPlan[ds].concepts) current.concepts = { ...newPlan[ds].concepts };
+                        else if (newPlan[ds].concept) current.concepts = { [newPlan[ds].concept]: newPlan[ds].manualHours !== undefined ? newPlan[ds].manualHours : null };
+                    } else if (typeof newPlan[ds] === 'string') {
+                        if (['intensiva', 'partida'].includes(newPlan[ds])) current.base = newPlan[ds];
+                        else current.concepts = { [newPlan[ds]]: null };
+                    }
+
+                    if (current.concepts[tool.id] !== undefined) {
+                        delete current.concepts[tool.id];
+                    } else {
+                        current.concepts[tool.id] = null;
+                    }
+                    
+                    if (!current.base && Object.keys(current.concepts).length === 0) delete newPlan[ds];
+                    else newPlan[ds] = current;
+                    
+                    setAnnualPlan(newPlan); save(newPlan, 'annual_plan');
                 } else {
                     setToolActionModal({ ds, toolId: tool.id, toolLabel: tool.label });
                 }
