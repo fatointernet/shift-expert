@@ -1,14 +1,13 @@
-<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ShiftExpert - GESTIÓN DE TURNOS</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.300.0"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -78,12 +77,12 @@
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        const { useState, useEffect, useMemo, useCallback } = React;
-
         // --- FIREBASE INFRASTRUCTURE ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+        const { useState, useEffect, useMemo, useCallback } = React;
 
         const firebaseConfig = {
             apiKey: "AIzaSyDaAn2WUiHDnIRU5SZ9sogOsICUcvG1DSI",
@@ -534,7 +533,7 @@
                                                     <input 
                                                         type="number" 
                                                         step="0.01" 
-                                                        className="w-20 bg-transparent text-right text-xs font-black text-indigo-600 outline-none" 
+                                                        className="w-full bg-transparent text-right text-xs font-black text-indigo-600 outline-none" 
                                                         placeholder="Auto"
                                                         value={hrs !== null && hrs !== undefined ? hrs : ''} 
                                                         onChange={(e) => handleHourChange(cId, e.target.value)} 
