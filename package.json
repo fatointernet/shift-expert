@@ -1,0 +1,11 @@
+{
+  "name": "shift-expert",
+  "private": true,
+  "description": "ShiftExpert: gestión de turnos y pluses (V Convenio ANAV). Web estática sin build.",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@babel/standalone": "7.23.6"
+  }
+}

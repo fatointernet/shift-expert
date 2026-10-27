@@ -1,0 +1,6 @@
+node_modules/
+reference/
+*.pdf
+*.xlsx
+.DS_Store
+.env

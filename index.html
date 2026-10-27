@@ -111,11 +111,15 @@
         };
 
         const DEFAULT_GLOBAL_CONST = { 
-            FOOD: 40.69, KM_PRICE: 0.55, P1_BASE: 32.90, P1_FRI: 46.74
+            FOOD: 40.69, KM_PRICE: 0.55, P1_BASE: 32.90, P1_FRI: 46.74,
+            // Complemento de llamada para quien NO está de retén (art. 38 del convenio):
+            // 54,47 € laborable y 98,35 € festivo (2023) x 1,0638 = 2026. Confirmado con la nómina de junio 2026.
+            COMP_LLAMADA_L: 57.94, COMP_LLAMADA_F: 104.62
         };
 
         const GLOBAL_LABELS = {
-            FOOD: "Ayuda Comida", KM_PRICE: "Precio Kilometraje", P1_BASE: "Plus P1 (Lun-Jue)", P1_FRI: "Plus P1 (Viernes)"
+            FOOD: "Ayuda Comida", KM_PRICE: "Precio Kilometraje", P1_BASE: "Plus P1 (Lun-Jue)", P1_FRI: "Plus P1 (Viernes)",
+            COMP_LLAMADA_L: "Comp. Llamada (Laborable)", COMP_LLAMADA_F: "Comp. Llamada (Festivo)"
         };
 
         const SHIFTS = [
@@ -823,7 +827,7 @@
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'annual_plan'), snap => snap.exists() && setAnnualPlan(snap.data().data || {}), () => {}),
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'planner_counters'), snap => snap.exists() && setPlannerCounters(snap.data().data || DEFAULT_PLANNER_COUNTERS), () => {}),
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'profile'), snap => snap.exists() && setProfile(p => ({ ...p, ...snap.data().data })), () => {}),
-                    onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'globalRates'), snap => snap.exists() && setGlobalRates(snap.data().data || DEFAULT_GLOBAL_CONST), () => {}),
+                    onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'globalRates'), snap => snap.exists() && setGlobalRates({ ...DEFAULT_GLOBAL_CONST, ...(snap.data().data || {}) }), () => {}),
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'salaryMatrix'), snap => snap.exists() && setSalaryMatrix(snap.data().data || DEFAULT_SALARY_DATA), () => {}),
                     onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'data', 'userColors'), snap => snap.exists() && setUserColors(snap.data().data || {}), () => {})
                 ];
@@ -905,7 +909,7 @@
                     if (id === 'trc_comp') add(`Comp. TRC 25% (x${count})`, (rates.trc_comp || 0) * count, 'trc_comp', count);
                     if (id === 'tra') add(`Plus TRA ${isF ? 3 : 2}x (x${count})`, (traRate * (isF ? 3 : 2)) * count, 'tra', count);
                     if (id === 'plus_llamada') add(`Plus Llamada (x${count})`, rates.call * count, 'call_plus', count);
-                    if (id === 'comp_llamada' && !data.isReten) add(`Comp. Llamada (x${count})`, (isF ? rates.r_f : rates.r_l) * count, 'call_comp', count);
+                    if (id === 'comp_llamada' && !data.isReten) { const compRate = isF ? (globalRates.COMP_LLAMADA_F ?? DEFAULT_GLOBAL_CONST.COMP_LLAMADA_F) : (globalRates.COMP_LLAMADA_L ?? DEFAULT_GLOBAL_CONST.COMP_LLAMADA_L); add(`Comp. Llamada (x${count})`, compRate * count, 'call_comp', count); }
                     if (id === 'comida') add(`Ayuda Comida (x${count})`, globalRates.FOOD * count, 'food', count);
                     if (id === 'otros' && parseFloat(data.otrosValue) > 0) add(data.otrosLabel || 'Otros', parseFloat(data.otrosValue) * count, 'custom', count);
                 });
