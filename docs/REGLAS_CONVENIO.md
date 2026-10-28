@@ -51,10 +51,12 @@ Turnos rotativos de recarga (Documento 7 del convenio) y plus de turno (art. 31)
 | R7 (07:00-19:00) | TRRc12 | 1,5 pluses TRC | 1,5 pluses TRC |
 | R9 (19:00-07:00) | TRRc12 | 2,5 pluses TRC | 2,5 pluses TRC |
 | P1 | jornada partida | ayuda comida 32,90 (viernes 46,74) | |
-| I7 | turno abierto normal | 1 plus TRA por día trabajado (art. 31) ⚠ la app no lo cuenta | |
+| I7 | turno abierto normal | 1 plus TRA por día trabajado (art. 31), sin multiplicar por festivo | 1 plus TRA |
 | D | descanso o vacaciones | nada | |
 
 ✅ Los multiplicadores de la tabla están implementados y coinciden con la nómina. El plus de turno compensa incomodidades, el descanso por horario continuado y el solape en el relevo.
+
+**I7 (turno abierto normal, art. 31)** ✅: confirmado con la nómina de junio de 2026, línea "TURNO ABIERTO 1 22,24" — 1 unidad al precio base de TRA (22,24 €, G V nivel 7), sin multiplicar ×2/×3 como en R1/R3. Implementado el 28/10/2026: al elegir turno I7 se añade 1 plus TRA a tarifa base, igual en laborable que en festivo.
 
 Festivo para la app: sábado, domingo, día marcado como festivo, o fiesta oficial o local del planificador (`cnt_1`, `cnt_3`, `festivo_especial`).
 

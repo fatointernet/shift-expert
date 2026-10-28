@@ -11,7 +11,7 @@ Ordenados por prioridad. Lo marcado "por confirmar" necesita evidencia (convenio
 Ninguna se ha tocado porque no hay nómina que las confirme.
 1. **Comp. llamada laborable (57,94)**: sale del art. 38 (54,47 × 1,0638). La nómina de junio solo tuvo casos festivos.
 2. **P1 en víspera de festivo intersemanal**: el convenio (art. 20.3.d) paga 46,74 también en la víspera, la app solo en viernes.
-3. **I7**: según el art. 31 devenga 1 plus TRA por día trabajado; la app no lo cuenta. Por confirmar con nómina.
+3. ✅ **I7**: implementado 28/10/2026, confirmado con nómina ("TURNO ABIERTO 1 22,24"). 1 plus TRA a tarifa base por día trabajado, sin multiplicar por festivo.
 4. **Umbral de 5 h 30 min** en horas extra de festivo para el descanso adicional (art. 20.4.d): la app no lo comprueba.
 5. **Horas extra nocturnas con descanso 2x**: la app mira las horas nocturnas del día, el convenio habla de horas extra nocturnas.
 6. **Dieta de desayuno** (8,13): no existe en la app.
