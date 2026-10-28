@@ -1,9 +1,15 @@
 # Arquitectura
 
 ## Stack
-- Un único `index.html` estático. Sin build. React 18.2 (UMD), Tailwind (CDN), `@babel/standalone` 7.23.6 (compila el JSX en el navegador), iconos lucide y Firebase 11 (Auth + Firestore) por CDN.
+- Un único `index.html` estático. Sin build. React 18.2 (UMD), Tailwind (CDN), `@babel/standalone` 7.23.6 (compila el JSX en el navegador), iconos lucide, `pdfjs-dist` 3.4.120 (lee el PDF de la nómina en la pestaña Verificar) y Firebase 11 (Auth + Firestore) por CDN.
 - El script principal es `<script type="text/babel" data-type="module">`. Un error de sintaxis deja la web en blanco: por eso `tests/syntax.test.mjs` compila el bloque con Babel.
 - GitHub Pages sirve la rama `main` del repositorio público `fatointernet/shift-expert`.
+
+## Pestaña Verificar (lectura de nómina)
+- Compara, mes a mes, lo que calcula `calcDay`/`stats.month` con los importes reales de la nómina. No usa Firestore: los datos que se escriben (a mano o desde el PDF) son solo del navegador en ese momento, se pierden al recargar.
+- El PDF se lee entero en el navegador con `pdfjs-dist` (`extractPdfRows`, `parsePayslipRows`); nada sale del dispositivo. Busca cada concepto solo dentro del bloque "** DEVENGOS **"…"** RETENCIONES **" del recibo de ANAV, porque nombres como "HORAS EXTRA" o "KILOMETRAJE" se repiten más abajo como base de cotización o deducción.
+- Depende del formato de recibo de ANAV (el mismo que `reference/nomina-AAAA-MM.pdf`, nunca en el repo). Si la empresa cambia el diseño del recibo, el reconocimiento automático puede dejar de encontrar conceptos — por eso siempre se puede rellenar a mano y se avisa de cuántos conceptos reconoció.
+- Probado con una nómina real (junio 2026): reconoce los 10 conceptos esperados (no reconoce Comp. TRC 25% ni Otros, que no tienen una etiqueta fija en el recibo).
 
 ## Firebase
 - Proyecto `notasdegasto-12d33` (compartido con otra app). La configuración pública está en el código, es normal en web apps; la seguridad real depende de las **reglas de Firestore**, que no se han revisado todavía (ver `PENDIENTES.md`).
