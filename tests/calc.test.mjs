@@ -74,6 +74,12 @@ test('TRA: 2 pluses en laborable y 3 en festivo', () => {
     near(tra(SAB), 22.24 * 3, 'TRA festivo');
 });
 
+test('I7: 1 plus TRA por día trabajado, sin multiplicar (art. 31; nómina junio 2026: "TURNO ABIERTO 1 22,24")', () => {
+    const tra = (day) => item(calc(day, { shift: 'I7', activeConceptsCount: { tra: 1 } }), 'tra')[0].value;
+    near(tra(LUN), 22.24, 'I7 TRA laborable');
+    near(tra(SAB), 22.24, 'I7 TRA festivo (sin multiplicar, a diferencia de R1/R3)');
+});
+
 test('plus P1: 32,90 de lunes a jueves y 46,74 el viernes', () => {
     near(item(calc(LUN, { shift: 'P1' }), 'p1')[0].value, 32.90, 'P1 lunes');
     near(item(calc(VIE, { shift: 'P1' }), 'p1')[0].value, 46.74, 'P1 viernes');
