@@ -23,7 +23,7 @@ Tú eres la persona encargada de mantenerla y mejorarla. Jordi no es programador
 - `npm install` (solo instala Babel para las pruebas) y `npm test` (23 pruebas: cálculo de pluses y compilación del JSX).
 - Probar en local: `python3 -m http.server 8000` y abrir http://localhost:8000. El login usa Firebase Auth; si en local falla, hay que revisar los dominios autorizados en la consola de Firebase (por comprobar).
 - Despliegue: `git push` a `main`; GitHub Pages publica en uno o dos minutos.
-- Volver atrás: la etiqueta `v0-original-gemini` guarda la versión anterior a esta fase. `git checkout v0-original-gemini -- index.html` la restaura.
+- Volver atrás: el commit `c83e022` es la versión anterior a esta fase (no hay etiqueta `v0-original-gemini` subida a GitHub). `git checkout c83e022 -- index.html` la restaura.
 
 ## Dónde está cada cosa
 Todo el código está en `index.html` (React 18, Tailwind, Babel y Firebase 11 por CDN, sin paso de compilación):
