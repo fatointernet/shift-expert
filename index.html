@@ -907,7 +907,7 @@
                     if ((data.shift === 'R7' || data.shift === 'R9') && ['plus_llamada', 'comp_llamada'].includes(id) && !isF) return;
                     if (id === 'trc') { let m = data.shift === 'R7' ? 1.5 : data.shift === 'R9' ? 2.5 : data.shift === 'S5' ? (isF ? 3 : 2) : (['S1', 'S3'].includes(data.shift) ? (isF ? 2 : 1) : 1); add(`Plus TRC ${m}x (x${count})`, (trcRate * m) * count, 'trc', m * count); }
                     if (id === 'trc_comp') add(`Comp. TRC 25% (x${count})`, (rates.trc_comp || 0) * count, 'trc_comp', count);
-                    if (id === 'tra') { const traMult = data.shift === 'I7' ? 1 : (isF ? 3 : 2); add(`Plus TRA ${traMult}x (x${count})`, (traRate * traMult) * count, 'tra', count); }
+                    if (id === 'tra') { const traMult = data.shift === 'I7' ? 1 : (isF ? 3 : 2); add(`Plus TRA ${traMult}x (x${count})`, (traRate * traMult) * count, 'tra', traMult * count); }
                     if (id === 'plus_llamada') add(`Plus Llamada (x${count})`, rates.call * count, 'call_plus', count);
                     if (id === 'comp_llamada' && !data.isReten) { const compRate = isF ? (globalRates.COMP_LLAMADA_F ?? DEFAULT_GLOBAL_CONST.COMP_LLAMADA_F) : (globalRates.COMP_LLAMADA_L ?? DEFAULT_GLOBAL_CONST.COMP_LLAMADA_L); add(`Comp. Llamada (x${count})`, compRate * count, 'call_comp', count); }
                     if (id === 'comida') add(`Ayuda Comida (x${count})`, globalRates.FOOD * count, 'food', count);
