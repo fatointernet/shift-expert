@@ -80,6 +80,13 @@ test('I7: 1 plus TRA por día trabajado, sin multiplicar (art. 31; nómina junio
     near(tra(SAB), 22.24, 'I7 TRA festivo (sin multiplicar, a diferencia de R1/R3)');
 });
 
+test('el contador de Balance de TRA suma unidades ponderadas por el multiplicador, igual que TRC (para que x unidades × tarifa base cuadre con la nómina)', () => {
+    const qty = (day, shift) => item(calc(day, { shift, activeConceptsCount: { tra: 1 } }), 'tra')[0].qty;
+    assert.equal(qty(LUN, 'R1'), 2, 'R1 laborable: 1 unidad x2 = 2');
+    assert.equal(qty(SAB, 'R1'), 3, 'R1 festivo: 1 unidad x3 = 3');
+    assert.equal(qty(LUN, 'I7'), 1, 'I7: 1 unidad x1 = 1');
+});
+
 test('plus P1: 32,90 de lunes a jueves y 46,74 el viernes', () => {
     near(item(calc(LUN, { shift: 'P1' }), 'p1')[0].value, 32.90, 'P1 lunes');
     near(item(calc(VIE, { shift: 'P1' }), 'p1')[0].value, 46.74, 'P1 viernes');
