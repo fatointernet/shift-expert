@@ -21,7 +21,7 @@ Ninguna se ha tocado porque no hay nómina que las confirme.
 10. Redondeo: la nómina usa 2023 × 1,0638 sin redondear; la app usa valores de 2 decimales. Diferencias de céntimos (0,36 € en 73 h extra). Se puede ignorar o guardar más decimales.
 
 ## 3. Errores pequeños
-- Clases `max-sm` y `max-lg` mal escritas (caja de login y modal de ajustes); en Tailwind son `max-sm:` / `max-lg:` como variantes, así que esas clases no hacen nada. Buscar con `grep -n "max-sm\|max-lg" index.html`.
+- ✅ Clases `max-sm` y `max-lg` corregidas a `max-w-sm` / `max-w-lg` (caja de login y modal de ajustes), 28/10/2026.
 - `PriceConfigPage` oculta las claves antiguas `CALL_L` y `CALL_F`.
 - `new Date(dateStr)` interpreta la fecha ISO como UTC. En España funciona; se rompería con otra zona horaria.
 
