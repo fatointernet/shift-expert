@@ -3,7 +3,7 @@
 Ordenados por prioridad. Lo marcado "por confirmar" necesita evidencia (convenio o nómina) antes de tocar el código.
 
 ## 1. Comprobaciones con Jordi (sin código)
-- Comparar la pestaña Balance de junio de 2026 con la nómina: TRC ×23,5, TRA ×1, nocturnidad 8 h, llamada ×4, horas extra 73 h, retén 5 + 2, comp. llamada festivo ×3, comida ×13, km 276, P1 ×4 más 1 en viernes. Hasta que lo haga, la app solo está comprobada pieza a pieza, no en total.
+- ✅ **Balance de junio de 2026 vs. nómina** (confirmado por Jordi, 28/10/2026): TRC ×23,5, TRA ×1, nocturnidad 8 h, llamada ×4, horas extra 73 h, retén 5 + 2, comp. llamada festivo ×3, comida ×13, km 276, P1 ×4 más 1 en viernes. La app está comprobada en total, no solo pieza a pieza.
 - ✅ **Reglas de seguridad de Firestore** (revisadas 27/10/2026): la ruta de ShiftExpert, `artifacts/anav-shift-calc-v5/users/{userId}/data/{document=**}`, exige `request.auth != null && request.auth.uid == userId`. Correcto: nadie puede leer ni escribir los datos de otro usuario. No se ha visto el resto del fichero de reglas (la otra app que comparte el proyecto), así que eso queda sin revisar.
 - ✅ **Dominios autorizados de Firebase Auth** (revisado 28/10/2026): están `localhost`, `fatointernet.github.io`, `notasdegasto-12d33.firebaseapp.com` y `notasdegasto-12d33.web.app`. Login funciona en local y en producción.
 
