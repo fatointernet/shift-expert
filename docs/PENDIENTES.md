@@ -26,8 +26,9 @@ Ninguna se ha tocado porque no hay nómina que las confirme.
 - `new Date(dateStr)` interpreta la fecha ISO como UTC. En España funciona; se rompería con otra zona horaria.
 
 ## 4. Privacidad y datos
-- `DEFAULT_PLANNER_COUNTERS` contiene saldos de horas personales en un repositorio **público**. Sustituirlos por valores vacíos (Jordi los tiene ya en Firestore) y valorar limpiar el historial de git si le importa.
-- El historial público ya contiene la configuración de Firebase (normal) y esos saldos.
+- ✅ `DEFAULT_PLANNER_COUNTERS` puesto a cero (28/10/2026). No afecta a Jordi: su cuenta ya tiene los saldos reales guardados en Firestore (regla de oro 2: lo guardado manda sobre los valores por defecto), así que esto solo cambia lo que ve un usuario nuevo sin datos propios.
+- ⚠ El historial de git **sigue conteniendo** los saldos antiguos (son commits ya públicos). Si quieres borrarlos también del historial, hay que reescribirlo (`git filter-repo` o similar) y forzar push — es una operación delicada, lo hablamos aparte si te importa.
+- La configuración de Firebase en el código sigue siendo pública (normal en apps web, la seguridad depende de las reglas de Firestore, ya revisadas).
 
 ## 5. Deuda técnica
 - Todos los turnos están en un solo documento `shifts` y se guarda en cada pulsación de tecla. Firestore limita un documento a 1 MiB: con años de datos puede llegar al límite, y hay riesgo de pisar cambios entre dispositivos. Solución: guardar con retraso (debounce) y, más adelante, un documento por mes (con migración compatible hacia atrás).
